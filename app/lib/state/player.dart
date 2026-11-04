@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../player/engine.dart';
+import 'search.dart';
 
 enum Repeat { off, all, one }
 
@@ -12,6 +13,8 @@ enum LoadStatus { idle, loading, ok, error }
 
 const sourceWave = 'wave';
 const sourceLiked = 'liked';
+const sourceHome = 'home';
+const sourceChart = 'chart';
 
 String topTracksOf(String artist) => '$artist/tracks';
 
@@ -149,6 +152,28 @@ class LibraryPlaylist {
   final int count;
 }
 
+class HomeFeed {
+  const HomeFeed({
+    this.status = LoadStatus.idle,
+    this.personal = const [],
+    this.history = const [],
+    this.releases = const [],
+    this.playlists = const [],
+    this.chart = const [],
+    this.error = '',
+  });
+
+  final LoadStatus status;
+  final List<SearchHit> personal, history, releases, playlists;
+  final List<PlayTrack> chart;
+  final String error;
+}
+
+List<SearchHit> _hits(Object? v) => [
+  for (final h in (v as List? ?? const []))
+    if (h is Map<String, dynamic>) SearchHit.fromJson(h),
+];
+
 class Library {
   const Library({
     this.status = LoadStatus.idle,
@@ -231,7 +256,7 @@ class PlayerState extends ChangeNotifier {
   final duration = ValueNotifier(Duration.zero);
 
   final panelOpen = ValueNotifier(false);
-  final browse = ValueNotifier(sourceLiked);
+  final browse = ValueNotifier(sourceHome);
   final browsing = ValueNotifier(false);
   final _history = <String>[];
 
@@ -253,10 +278,15 @@ class PlayerState extends ChangeNotifier {
       return;
     }
     browse.value = _history.removeLast();
+    if (browse.value == sourceHome) {
+      browsing.value = false;
+      return;
+    }
     openList(browse.value);
   }
 
   var library = const Library();
+  var home = const HomeFeed();
   final lists = <String, TrackList>{};
   final _marks = <String, (bool, bool)>{};
   var likedCount = 0;
@@ -290,6 +320,18 @@ class PlayerState extends ChangeNotifier {
         _marks[_s(ev['track'])] = (ev['liked'] == true, ev['disliked'] == true);
         likedCount = _i(ev['likedCount']);
         if (lists.containsKey(sourceLiked)) _send({'cmd': 'open', 'source': sourceLiked});
+      case 'home':
+        final error = _s(ev['error']);
+        home = error.isNotEmpty
+            ? HomeFeed(status: LoadStatus.error, error: error)
+            : HomeFeed(
+                status: LoadStatus.ok,
+                personal: _hits(ev['personal']),
+                history: _hits(ev['history']),
+                releases: _hits(ev['releases']),
+                playlists: _hits(ev['playlists']),
+                chart: _tracks(ev['chart']),
+              );
       case 'library':
         final error = _s(ev['error']);
         likedCount = _i(ev['likedCount']);
@@ -519,7 +561,18 @@ class PlayerState extends ChangeNotifier {
     notifyListeners();
   }
 
+  void loadHome({bool force = false}) {
+    if (!force && (home.status == LoadStatus.ok || home.status == LoadStatus.loading)) return;
+    home = const HomeFeed(status: LoadStatus.loading);
+    _send({'cmd': 'home'});
+    notifyListeners();
+  }
+
   void openList(String source, {bool force = false}) {
+    if (source == sourceHome) {
+      loadHome(force: force);
+      return;
+    }
     final known = lists[source];
     if (!force && known != null && known.status != LoadStatus.error) return;
     lists[source] = const TrackList();

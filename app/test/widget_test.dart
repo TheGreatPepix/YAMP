@@ -320,7 +320,9 @@ void main() {
   testWidgets('«Мне нравится» и отдельный трек качаются из меню', (tester) async {
     final (core, c) = await _open(tester);
     await _login(tester, 'good-token');
-    expect(find.text('Мне нравится'), findsWidgets);
+    await tester.tap(find.text('Мне нравится'));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
 
     await _choose(tester, find.byTooltip('Скачать'), 'Скачать FLAC');
     expect(core.lastDownload, {'cmd': 'download', 'link': 'liked', 'quality': 'lossless'});
@@ -446,6 +448,56 @@ void main() {
     expect(c.search.open, isFalse);
     expect(c.player.browse.value, _album);
 
+    await core.close();
+  });
+  testWidgets('главная: подборки, история, чарт и новинки', (tester) async {
+    final (core, c) = await _open(tester);
+    await _login(tester, 'good-token');
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+
+    expect(c.player.browse.value, 'home');
+    for (final title in ['Для вас', 'Вы недавно слушали', 'Чарт']) {
+      expect(find.text(title), findsOneWidget);
+    }
+    expect(find.text('Плейлист дня'), findsOneWidget);
+    expect(find.text('Хит 1'), findsOneWidget);
+    final feed = find.byWidgetPredicate((w) => w is Scrollable && w.axisDirection == AxisDirection.down).last;
+    await tester.scrollUntilVisible(find.text('Новые плейлисты'), 200, scrollable: feed);
+    expect(find.text('Новые релизы'), findsOneWidget);
+    expect(find.text('Новинка 1'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('Хит 2'), -200, scrollable: feed);
+
+    await tester.tap(find.text('Хит 2'));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+    expect(c.player.track?.id, 'c2');
+    expect(c.player.source?.kind, 'chart');
+
+    await tester.scrollUntilVisible(find.text('Весь чарт'), -200, scrollable: feed);
+    await tester.tap(find.text('Весь чарт'));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+    expect(c.player.browse.value, 'chart');
+    expect(find.text('ЧАРТ'), findsOneWidget);
+    await _choose(tester, find.byTooltip('Скачать'), 'Скачать MP3 320');
+    expect(core.lastDownload, {'cmd': 'download', 'link': 'chart', 'quality': 'mp3'});
+
+    await tester.tap(find.text('Назад'));
+    await tester.pumpAndSettle();
+    expect(c.player.browse.value, 'home');
+
+    await tester.scrollUntilVisible(find.text('Ночь'), -200, scrollable: feed);
+    await tester.tap(find.text('Ночь'));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+    expect(c.player.browse.value, 'https://music.yandex.ru/album/77');
+    await tester.tap(find.text('Главная'));
+    await tester.pumpAndSettle();
+    expect(c.player.browse.value, 'home');
+    expect(find.text('Ночь'), findsOneWidget);
+
+    await tester.pumpAndSettle(const Duration(seconds: 5));
     await core.close();
   });
 }

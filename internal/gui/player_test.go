@@ -7,6 +7,7 @@ import (
 	"crypto/cipher"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -83,6 +84,33 @@ func newFakeMusic(t *testing.T) *fakeMusic {
 			w.Write([]byte(`{"result":{"tracks":[` + track("20") + `,` + track("21") + `]}}`))
 		case "/users/me/playlists/1001":
 			w.Write([]byte(`{"result":{"title":"Дорога","trackCount":3,"tracks":[{"track":` + track("20") + `},{"track":` + track("21") + `},{"track":` + track("22") + `}]}}`))
+		case "/feed":
+			w.Write([]byte(`{"result":{"generatedPlaylists":[{"type":"playlistOfTheDay","ready":true,"data":{"uid":5,"kind":100,"title":"Плейлист дня","owner":{"login":"yamusic-daily"}}},{"type":"missedLikes","ready":false,"data":{"uid":5,"kind":101,"title":"Не готов"}}]}}`))
+		case "/music-history":
+			w.Write([]byte(`{"result":{"historyTabs":[{"items":[` +
+				`{"context":{"type":"album","data":{"fullModel":{"album":{"id":9,"title":"Al","artists":[{"name":"A"}]}}}}},` +
+				`{"context":{"type":"wave","data":{}}},` +
+				`{"context":{"type":"album","data":{"fullModel":{"album":{"id":9,"title":"Al"}}}}},` +
+				`{"context":{"type":"artist","data":{"fullModel":{"artist":{"id":3,"name":"A"}}}}}]}]}}`))
+		case "/landing3/new-releases":
+			w.Write([]byte(`{"result":{"newReleases":[11,12]}}`))
+		case "/albums":
+			ids := strings.Split(r.PostForm.Get("album-ids"), ",")
+			var items []string
+			for _, id := range ids {
+				items = append(items, `{"id":`+id+`,"title":"New `+id+`","artists":[{"name":"B"}],"year":2026}`)
+			}
+			w.Write([]byte(`{"result":[` + strings.Join(items, ",") + `]}`))
+		case "/landing3/new-playlists":
+			w.Write([]byte(`{"result":{"newPlaylists":[{"uid":7,"kind":3}]}}`))
+		case "/playlists/list":
+			if r.PostForm.Get("playlist-ids") != "7:3" {
+				http.Error(w, "bad ids", http.StatusBadRequest)
+				return
+			}
+			w.Write([]byte(`{"result":[{"uid":7,"kind":3,"title":"Свежее","trackCount":40,"owner":{"login":"music"}}]}`))
+		case "/landing3/chart":
+			w.Write([]byte(`{"result":{"title":"Чарт","chart":{"tracks":[{"track":` + track("31") + `,"chart":{"position":1}},{"track":` + track("32") + `,"chart":{"position":2}}]}}}`))
 		case "/get-file-info":
 			json.NewEncoder(w).Encode(map[string]any{"result": map[string]any{"downloadInfo": map[string]any{
 				"codec": "flac-mp4", "key": hex.EncodeToString(f.key), "urls": []string{f.srv.URL + "/file/" + r.URL.Query().Get("trackId")},
@@ -344,5 +372,42 @@ func TestPlayerOpenAlbumsOnlyForArtist(t *testing.T) {
 	top := open("https://music.yandex.ru/artist/3/tracks")
 	if _, ok := top["albums"]; ok || len(top["tracks"].([]any)) != 2 {
 		t.Errorf("популярные треки = %v", top)
+	}
+}
+
+func TestHome(t *testing.T) {
+	c, _, log := startPlayerCore(t)
+
+	send(c, map[string]any{"cmd": "home"})
+	ev := log.wait(t, "home", nil)
+	if ev["error"] != nil {
+		t.Fatalf("главная с ошибкой: %v", ev["error"])
+	}
+	titles := func(key string) []string {
+		var out []string
+		list, _ := ev[key].([]any)
+		for _, it := range list {
+			m, _ := it.(map[string]any)
+			out = append(out, fmt.Sprint(m["title"], "|", m["link"]))
+		}
+		return out
+	}
+	check := func(key string, want ...string) {
+		t.Helper()
+		if got := titles(key); strings.Join(got, ";") != strings.Join(want, ";") {
+			t.Errorf("%s = %v, ждали %v", key, got, want)
+		}
+	}
+	check("personal", "Плейлист дня|https://music.yandex.ru/users/yamusic-daily/playlists/100")
+	check("history", "Al|https://music.yandex.ru/album/9", "A|https://music.yandex.ru/artist/3")
+	check("releases", "New 11|https://music.yandex.ru/album/11", "New 12|https://music.yandex.ru/album/12")
+	check("playlists", "Свежее|https://music.yandex.ru/users/music/playlists/3")
+	check("chart", "T31|https://music.yandex.ru/album/9/track/31", "T32|https://music.yandex.ru/album/9/track/32")
+
+	send(c, map[string]any{"cmd": "play", "source": "chart", "track": "32"})
+	played := log.wait(t, "player", playing("32", "play"))
+	src, _ := played["source"].(map[string]any)
+	if src["kind"] != "chart" || src["title"] != "Чарт" {
+		t.Errorf("источник = %v", played["source"])
 	}
 }

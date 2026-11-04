@@ -375,6 +375,12 @@ func (g *App) loadSource(ctx context.Context, sess *yam.Session, source string) 
 			return nil, err
 		}
 		list = &trackList{Source: playSource{Kind: sourceLiked, ID: sourceLiked, Title: "Мне нравится"}, Tracks: tracks}
+	} else if source == yam.ChartLink {
+		rel, err := sess.Chart(ctx)
+		if err != nil {
+			return nil, err
+		}
+		list = &trackList{Source: playSource{Kind: yam.ChartLink, ID: yam.ChartLink, Title: rel.Title}, Tracks: rel.Tracks}
 	} else {
 		l, err := yam.ParseLink(source)
 		if err != nil {

@@ -28,11 +28,12 @@ class MainPage extends StatelessWidget {
     return Scaffold(
       body: SafeArea(
         child: ListenableBuilder(
-          listenable: Listenable.merge([c.downloadsOpen, c.search, c.section, c.player.panelOpen]),
+          listenable: Listenable.merge([c.downloadsOpen, c.search, c.section, c.player.panelOpen, c.player.browsing]),
           builder: (context, _) {
             final open = c.downloadsOpen.value;
             final playerOpen = c.player.panelOpen.value;
             final inSearch = c.section.value == Section.search;
+            final offHome = inSearch || (c.section.value == Section.collection && !c.player.browsing.value);
             final searching = inSearch && c.search.open;
             return LayoutBuilder(
               builder: (context, box) {
@@ -41,9 +42,9 @@ class MainPage extends StatelessWidget {
                     ? FocusTraversalGroup(child: SearchView(c: c))
                     : phone && inSearch
                     ? const _SearchIntro()
-                    : LibraryView(c: c, phone: phone);
+                    : LibraryView(c: c, phone: phone, collection: c.section.value == Section.collection);
                 return PopScope(
-                  canPop: !open && !playerOpen && !searching && !(phone && inSearch),
+                  canPop: !open && !playerOpen && !searching && !(phone && offHome),
                   onPopInvokedWithResult: (didPop, _) {
                     if (didPop) return;
                     if (playerOpen) {
@@ -52,7 +53,7 @@ class MainPage extends StatelessWidget {
                       _close();
                     } else if (searching) {
                       c.search.close();
-                    } else {
+                    } else if (phone && offHome) {
                       c.home();
                     }
                   },
@@ -70,7 +71,9 @@ class MainPage extends StatelessWidget {
                               ),
                             Divider(height: 1, color: scheme.outlineVariant),
                             Expanded(child: body),
-                            FocusTraversalGroup(child: MiniPlayer(p: c.player, phone: phone, onOpen: c.openPage)),
+                            FocusTraversalGroup(
+                              child: MiniPlayer(p: c.player, phone: phone, onOpen: c.openPage),
+                            ),
                             if (phone) _SectionBar(c: c),
                           ],
                         ),
@@ -160,7 +163,11 @@ class _SectionBar extends StatelessWidget {
       height: 64,
       selectedIndex: c.section.value.index,
       labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-      onDestinationSelected: (i) => i == Section.search.index ? c.openSearch() : c.home(),
+      onDestinationSelected: (i) => switch (Section.values[i]) {
+        Section.home => c.home(),
+        Section.search => c.openSearch(),
+        Section.collection => c.collection(),
+      },
       destinations: const [
         NavigationDestination(
           icon: Icon(Icons.home_outlined),
@@ -171,6 +178,11 @@ class _SectionBar extends StatelessWidget {
           icon: Icon(Icons.search_rounded),
           selectedIcon: Icon(Icons.manage_search_rounded),
           label: 'Поиск',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.library_music_outlined),
+          selectedIcon: Icon(Icons.library_music_rounded),
+          label: 'Коллекция',
         ),
       ],
     );

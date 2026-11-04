@@ -93,6 +93,8 @@ func (g *App) onMessage(message string) {
 		g.search(c.Seq, strings.TrimSpace(c.Query), c.Kind, c.Page)
 	case "library":
 		g.library()
+	case "home":
+		g.home()
 	case "open":
 		g.openSource(strings.TrimSpace(c.Source))
 	case "play":

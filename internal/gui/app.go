@@ -255,7 +255,7 @@ func (g *App) startDownload(link, dir string, sel yam.Selection, quality string)
 		g.notice("Идёт обновление YAMP", "error")
 		return
 	}
-	if link != yam.LikedLink {
+	if link != yam.LikedLink && link != yam.ChartLink {
 		if _, err := yam.ParseLink(link); err != nil {
 			g.notice(err.Error(), "error")
 			return

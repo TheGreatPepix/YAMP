@@ -8,12 +8,13 @@ import '../download_menu.dart';
 import '../widgets.dart';
 import 'artist_view.dart';
 import 'controls.dart';
+import 'home_view.dart';
 
 class LibraryView extends StatefulWidget {
-  const LibraryView({super.key, required this.c, required this.phone});
+  const LibraryView({super.key, required this.c, required this.phone, this.collection = false});
 
   final Controller c;
-  final bool phone;
+  final bool phone, collection;
 
   @override
   State<LibraryView> createState() => _LibraryViewState();
@@ -28,7 +29,11 @@ class _LibraryViewState extends State<LibraryView> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       p.loadLibrary();
-      if (!widget.phone) p.openList(p.browse.value);
+      if (!widget.phone) {
+        p.openList(p.browse.value);
+      } else if (!widget.collection) {
+        p.loadHome();
+      }
     });
   }
 
@@ -57,12 +62,12 @@ class _LibraryViewState extends State<LibraryView> {
                         child: Row(
                           children: [
                             IconButton(
-                              tooltip: p.canBack ? 'Назад' : 'К библиотеке',
+                              tooltip: p.canBack ? 'Назад' : (widget.collection ? 'К коллекции' : 'На главную'),
                               icon: const Icon(Icons.arrow_back_rounded),
                               onPressed: p.back,
                             ),
                             Text(
-                              p.canBack ? 'Назад' : 'Библиотека',
+                              p.canBack ? 'Назад' : (widget.collection ? 'Коллекция' : 'Главная'),
                               style: TextStyle(color: scheme.onSurfaceVariant, fontWeight: FontWeight.w600),
                             ),
                           ],
@@ -73,7 +78,9 @@ class _LibraryViewState extends State<LibraryView> {
                       ),
                     ],
                   )
-                : LibraryList(p: p, selected: null, onOpen: _open),
+                : widget.collection
+                ? LibraryList(p: p, selected: null, onOpen: _open)
+                : HomeView(c: widget.c, phone: true),
           );
         }
         return Row(
@@ -82,7 +89,7 @@ class _LibraryViewState extends State<LibraryView> {
             SizedBox(
               width: MediaQuery.sizeOf(context).width >= 1100 ? 340 : 280,
               child: FocusTraversalGroup(
-                child: LibraryList(p: p, selected: source, onOpen: _open),
+                child: LibraryList(p: p, selected: source, onOpen: _open, onHome: widget.c.home),
               ),
             ),
             VerticalDivider(width: 1, color: scheme.outlineVariant),
@@ -99,11 +106,12 @@ class _LibraryViewState extends State<LibraryView> {
 }
 
 class LibraryList extends StatelessWidget {
-  const LibraryList({super.key, required this.p, required this.selected, required this.onOpen});
+  const LibraryList({super.key, required this.p, required this.selected, required this.onOpen, this.onHome});
 
   final PlayerState p;
   final String? selected;
   final void Function(String source) onOpen;
+  final VoidCallback? onHome;
 
   @override
   Widget build(BuildContext context) {
@@ -125,8 +133,10 @@ class LibraryList extends StatelessWidget {
         return ListView(
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
           children: [
-            _WaveCard(p: p),
+            WaveCard(p: p),
             const SizedBox(height: 8),
+            if (onHome != null)
+              _SourceTile(icon: Icons.home_rounded, title: 'Главная', selected: selected == sourceHome, onTap: onHome!),
             _SourceTile(
               icon: Icons.favorite_rounded,
               title: 'Мне нравится',
@@ -140,7 +150,7 @@ class LibraryList extends StatelessWidget {
                 child: Center(child: CircularProgressIndicator()),
               )
             else if (lib.status == LoadStatus.error)
-              _Problem(
+              Problem(
                 message: 'Не удалось загрузить плейлисты. ${lib.error}',
                 onRetry: () => p.loadLibrary(force: true),
               )
@@ -169,8 +179,8 @@ class LibraryList extends StatelessWidget {
   }
 }
 
-class _WaveCard extends StatelessWidget {
-  const _WaveCard({required this.p});
+class WaveCard extends StatelessWidget {
+  const WaveCard({super.key, required this.p});
 
   final PlayerState p;
 
@@ -347,8 +357,8 @@ class _TileShell extends StatelessWidget {
   }
 }
 
-class _Problem extends StatelessWidget {
-  const _Problem({required this.message, required this.onRetry});
+class Problem extends StatelessWidget {
+  const Problem({super.key, required this.message, required this.onRetry});
 
   final String message;
   final VoidCallback onRetry;
@@ -395,6 +405,7 @@ class TrackListView extends StatelessWidget {
     return ListenableBuilder(
       listenable: p,
       builder: (context, _) {
+        if (source == sourceHome) return HomeView(c: c, phone: phone);
         final list = p.lists[source] ?? const TrackList(status: LoadStatus.idle);
         if (list.status == LoadStatus.idle) {
           WidgetsBinding.instance.addPostFrameCallback((_) => p.openList(source));
@@ -404,7 +415,7 @@ class TrackListView extends StatelessWidget {
         }
         if (list.status == LoadStatus.error) {
           return Center(
-            child: _Problem(
+            child: Problem(
               message: 'Не удалось открыть список. ${list.error}',
               onRetry: () => p.openList(source, force: true),
             ),
@@ -505,6 +516,7 @@ class ListHeader extends StatelessWidget {
     final artist = kind == 'artist' && !top;
     final over = switch (kind) {
       sourceLiked => 'Коллекция',
+      sourceChart => 'Чарт',
       'album' => 'Альбом',
       'artist' when top => 'Популярные треки',
       'artist' => 'Исполнитель',
@@ -531,12 +543,13 @@ class ListHeader extends StatelessWidget {
       if (rest.isNotEmpty) LinkPart(rest),
     ];
     final size = kind == 'artist' ? (phone ? 96.0 : 168.0) : (phone ? 72.0 : 120.0);
-    final art = liked
+    final badge = liked ? Icons.favorite_rounded : (kind == sourceChart ? Icons.leaderboard_rounded : null);
+    final art = badge != null
         ? Container(
             width: phone ? 72 : 120,
             height: phone ? 72 : 120,
             decoration: BoxDecoration(color: scheme.primaryContainer, borderRadius: BorderRadius.circular(16)),
-            child: Icon(Icons.favorite_rounded, size: phone ? 32 : 52, color: context.status.accent),
+            child: Icon(badge, size: phone ? 32 : 52, color: context.status.accent),
           )
         : Cover(
             url: info?.cover ?? '',

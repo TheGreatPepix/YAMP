@@ -10,12 +10,12 @@ import 'models.dart';
 import 'player.dart';
 import 'search.dart';
 
-enum Section { home, search }
+enum Section { home, search, collection }
 
 class Controller extends ChangeNotifier {
   Controller(this.core, {Desktop? desktop, AudioEngine? engine})
-      : desktop = desktop ?? Desktop(),
-        player = PlayerState(core.send, engine ?? SilentEngine()) {
+    : desktop = desktop ?? Desktop(),
+      player = PlayerState(core.send, engine ?? SilentEngine()) {
     _sub = core.events.listen(_receive);
     player.onBlocked = (message) => _notices.add(Notice(message, kind: NoticeKind.error));
     player.panelOpen.addListener(() {
@@ -133,9 +133,7 @@ class Controller extends ChangeNotifier {
     send({'cmd': 'download', 'link': link, 'quality': quality.name});
     final format = quality == Quality.lossless ? 'FLAC' : 'MP3 320';
     final what = title.isEmpty ? '' : ' «$title»';
-    _notices.add(
-      Notice('Скачиваю$what в $format', action: 'Загрузки', onAction: () => downloadsOpen.value = true),
-    );
+    _notices.add(Notice('Скачиваю$what в $format', action: 'Загрузки', onAction: () => downloadsOpen.value = true));
   }
 
   void openLinks(String text) {
@@ -242,11 +240,8 @@ class Controller extends ChangeNotifier {
   }
 
   void _folderMissing(String path) => _notices.add(
-        Notice(
-          'Не нашлось приложения, чтобы открыть папку. Файлы лежат здесь: $path',
-          kind: NoticeKind.error,
-        ),
-      );
+    Notice('Не нашлось приложения, чтобы открыть папку. Файлы лежат здесь: $path', kind: NoticeKind.error),
+  );
 
   Future<void> chooseDir() async {
     try {
@@ -275,6 +270,14 @@ class Controller extends ChangeNotifier {
 
   void home() {
     section.value = Section.home;
+    player.panelOpen.value = false;
+    player.browseTo(sourceHome, fromLibrary: true);
+    player.browsing.value = false;
+  }
+
+  void collection() {
+    section.value = Section.collection;
+    player.browsing.value = false;
     player.loadLibrary();
   }
 
@@ -282,9 +285,9 @@ class Controller extends ChangeNotifier {
 
   void openPage(String source) {
     if (source.isEmpty) return;
-    final fresh = section.value != Section.home || !player.browsing.value;
+    final fresh = section.value == Section.search || (!player.browsing.value && player.browse.value != sourceHome);
     player.panelOpen.value = false;
-    home();
+    if (section.value == Section.search) section.value = Section.home;
     player.browseTo(source, fromLibrary: fresh);
   }
 
@@ -298,7 +301,7 @@ class Controller extends ChangeNotifier {
 
   void _receive(Event ev) {
     switch (ev['type']) {
-      case 'player' || 'queue' || 'playerFormat' || 'mark' || 'library' || 'tracks':
+      case 'player' || 'queue' || 'playerFormat' || 'mark' || 'library' || 'home' || 'tracks':
         player.receive(ev);
         return;
       case 'state':

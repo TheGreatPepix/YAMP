@@ -150,8 +150,11 @@ func (m *manager) run(ctx context.Context, j *job, sess *yam.Session, root strin
 }
 
 func resolveJob(ctx context.Context, sess *yam.Session, j *job) (*yam.Release, error) {
-	if j.Link == yam.LikedLink {
+	switch j.Link {
+	case yam.LikedLink:
 		return sess.ResolveLiked(ctx, sess.Account().UID)
+	case yam.ChartLink:
+		return sess.Chart(ctx)
 	}
 	link, err := yam.ParseLink(j.Link)
 	if err != nil {

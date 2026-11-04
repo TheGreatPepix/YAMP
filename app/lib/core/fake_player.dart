@@ -65,7 +65,21 @@ class FakePlayer {
     };
   }
 
+  static Map<String, Object?> _hit(String kind, String title, String artist, String link) => {
+    'kind': kind,
+    'id': link.split('/').last,
+    'title': title,
+    'artist': artist,
+    'link': link,
+  };
+
+  List<Map<String, Object?>> _chart() => [
+    for (var i = 0; i < 5; i++)
+      {..._track(i, id: 'c${i + 1}'), 'title': 'Хит ${i + 1}', 'artist': 'Чартовый', 'artists': const []},
+  ];
+
   List<Map<String, Object?>> _list(String source) => switch (source) {
+    'chart' => _chart(),
     _ when source.contains('/track/') => [_track(0, id: source.split('/').last)],
     'liked' => [
       for (var i = 0; i < _songs.length; i++)
@@ -89,6 +103,7 @@ class FakePlayer {
     },
     _ when source.contains('/track/') => {'kind': 'track', 'id': source, 'title': _songs[0].$1},
     'liked' => {'kind': 'liked', 'id': 'liked', 'title': 'Мне нравится'},
+    'chart' => {'kind': 'chart', 'id': 'chart', 'title': 'Чарт'},
     fakeEmptyPlaylist => {'kind': 'playlist', 'id': source, 'title': 'Пустой'},
     _ => {'kind': 'playlist', 'id': source, 'title': 'Дорога'},
   };
@@ -165,6 +180,34 @@ class FakePlayer {
     final track = c['track'];
     bool stale() => track != null && _current?['id'] != track;
     switch (c['cmd']) {
+      case 'home':
+        _later(const Duration(milliseconds: 150), () {
+          _emit({
+            'type': 'home',
+            'personal': [
+              _hit(
+                'playlist',
+                'Плейлист дня',
+                'Яндекс Музыка',
+                'https://music.yandex.ru/users/yamusic-daily/playlists/1',
+              ),
+              _hit('playlist', 'Дежавю', 'Яндекс Музыка', 'https://music.yandex.ru/users/yamusic-daily/playlists/2'),
+            ],
+            'history': [
+              _hit('album', 'Ночь', 'Кино', 'https://music.yandex.ru/album/77'),
+              _hit('artist', 'Наутилус Помпилиус', '', 'https://music.yandex.ru/artist/88'),
+              _hit('playlist', 'Вечер', 'Иван Петров', 'https://music.yandex.ru/users/ivan.petrov/playlists/1009'),
+            ],
+            'releases': [
+              for (var i = 1; i <= 6; i++)
+                _hit('album', 'Новинка $i', 'Исполнитель $i', 'https://music.yandex.ru/album/${500 + i}'),
+            ],
+            'playlists': [
+              _hit('playlist', 'Свежее', 'Яндекс Музыка', 'https://music.yandex.ru/users/music/playlists/3'),
+            ],
+            'chart': _chart(),
+          });
+        });
       case 'library':
         _later(const Duration(milliseconds: 150), () {
           _emit({

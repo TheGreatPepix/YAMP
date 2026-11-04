@@ -11,6 +11,7 @@ import 'package:yamp/state/player.dart';
 import 'package:yamp/ui/player/artist_view.dart';
 import 'package:yamp/ui/player/controls.dart';
 import 'package:yamp/ui/player/library_view.dart';
+import 'package:yamp/ui/player/mini_player.dart';
 import 'package:yamp/ui/player/now_playing.dart';
 import 'package:yamp/ui/search_view.dart';
 
@@ -81,7 +82,7 @@ void main() {
     expect(_tip('Не рекомендовать'), findsOneWidget);
     expect(_tip('Перемешать'), findsNothing);
 
-    await tester.tap(_tip('Мне нравится').first);
+    await tester.tap(find.descendant(of: find.byType(MiniPlayer), matching: _tip('Мне нравится')));
     await _settle(tester);
     expect(c.player.liked(c.player.track!), isTrue);
     expect(_tip('Убрать из «Мне нравится»'), findsWidgets);
@@ -99,7 +100,7 @@ void main() {
     await tester.tap(_tip('Пауза'));
     await _settle(tester);
     expect(engine.isPlaying, isFalse);
-    expect(_tip('Слушать'), findsOneWidget);
+    expect(find.descendant(of: find.byType(MiniPlayer), matching: _tip('Слушать')), findsOneWidget);
 
     await core.close();
   });
@@ -235,11 +236,20 @@ void main() {
       expect(popped, isTrue);
       expect(find.text('Сейчас играет'), findsNothing);
 
+      expect(find.text('Для вас'), findsOneWidget);
+      await tester.tap(find.text('Коллекция'));
+      await _settle(tester);
+      expect(c.section.value, Section.collection);
       await tester.tap(find.text('Мне нравится'));
       await _settle(tester);
-      expect(_tip('К библиотеке'), findsOneWidget);
-      await tester.tap(_tip('К библиотеке'));
+      expect(_tip('К коллекции'), findsOneWidget);
+      await tester.tap(_tip('К коллекции'));
       await _settle(tester);
+      expect(find.text('Дорога'), findsOneWidget);
+      final toHome = await tester.binding.handlePopRoute();
+      await _settle(tester);
+      expect(toHome, isTrue);
+      expect(c.section.value, Section.home);
 
       await tester.tap(find.text('Поиск'));
       await _settle(tester);
@@ -354,7 +364,7 @@ void main() {
     expect(c.section.value, Section.home);
     expect(c.player.browse.value, fakeArtist('Кино'));
     expect(find.text('ИСПОЛНИТЕЛЬ'), findsOneWidget);
-    expect(find.text('Назад'), findsNothing);
+    expect(find.text('Назад'), findsOneWidget);
 
     c.player.panelOpen.value = true;
     await _settle(tester);
@@ -427,9 +437,13 @@ void main() {
 
     final scroll = find.byType(Scrollable).last;
     await tester.scrollUntilVisible(find.text('Сборники'), 200, scrollable: scroll);
+    await tester.drag(scroll, const Offset(0, -300));
+    await tester.pumpAndSettle();
     expect(find.text('Синглы и EP'), findsOneWidget);
     final cards = tester.widgetList<AlbumCard>(find.byType(AlbumCard)).map((w) => w.album.title).toList();
     expect(cards, ['Чёрный альбом', 'Звезда по имени Солнце', 'Группа крови', 'Кукушка', 'Последний герой']);
+    await tester.ensureVisible(find.byType(AlbumCard).first);
+    await tester.pumpAndSettle();
     await tester.tap(find.byType(AlbumCard).first);
     await _settle(tester);
     expect(c.player.browse.value, 'https://music.yandex.ru/album/13');
