@@ -185,3 +185,16 @@ class SilentEngine implements AudioEngine {
     _timer?.cancel();
   }
 }
+
+class UnavailableEngine extends SilentEngine {
+  UnavailableEngine(this.reason);
+
+  final String reason;
+
+  @override
+  Future<void> open(String url, {Duration start = Duration.zero, bool play = true, Duration hint = Duration.zero}) =>
+      super.open(url, start: start, play: false, hint: hint);
+
+  @override
+  Future<void> play() async {}
+}

@@ -92,6 +92,16 @@
 «Системные настройки», раздел «Конфиденциальность и безопасность», и нажмите
 «Всё равно открыть».
 
+На Linux для прослушивания нужна библиотека libmpv из репозитория дистрибутива.
+Загрузка работает и без неё.
+
+```sh
+sudo apt install libmpv2      # Debian 12+, Ubuntu 24.04+
+sudo apt install libmpv1      # Ubuntu 22.04
+sudo dnf install mpv-libs     # Fedora
+sudo pacman -S mpv            # Arch
+```
+
 ## Важно
 
 Код YAMD открыт по лицензии [GPL-3.0](LICENSE), © 2026 TheGreatPepix.

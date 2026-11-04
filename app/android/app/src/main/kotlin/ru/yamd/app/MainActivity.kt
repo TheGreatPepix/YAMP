@@ -2,6 +2,7 @@ package ru.yamd.app
 
 import android.Manifest
 import android.content.ActivityNotFoundException
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -12,6 +13,7 @@ import android.provider.DocumentsContract
 import android.provider.Settings
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.embedding.engine.FlutterEngineCache
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
@@ -28,6 +30,11 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    override fun provideFlutterEngine(context: Context): FlutterEngine {
+        val cache = FlutterEngineCache.getInstance()
+        return cache.get(ENGINE) ?: FlutterEngine(context.applicationContext).also { cache.put(ENGINE, it) }
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         CoreBridge.start(this)
@@ -41,6 +48,7 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+        PlaybackService.attach(this, messenger)
         EventChannel(messenger, "yamd/core/events").setStreamHandler(object : EventChannel.StreamHandler {
             override fun onListen(arguments: Any?, events: EventChannel.EventSink?) = CoreBridge.attach(events)
             override fun onCancel(arguments: Any?) = CoreBridge.attach(null)
@@ -58,11 +66,6 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
-    }
-
-    override fun onDestroy() {
-        CoreBridge.attach(null)
-        super.onDestroy()
     }
 
     private fun open(target: String): Boolean = try {
@@ -191,6 +194,7 @@ class MainActivity : FlutterActivity() {
     }
 
     companion object {
+        private const val ENGINE = "main"
         private const val PICK_FOLDER = 41
         private const val EXTERNAL_DOCS = "com.android.externalstorage.documents"
         private const val DOWNLOAD_DOCS = "com.android.providers.downloads.documents"

@@ -409,12 +409,35 @@ class PlayerState extends ChangeNotifier {
     _send({'cmd': 'playerError', 'track': id, 'message': message});
   }
 
+  void Function(String message)? onBlocked;
+
+  String get unavailable {
+    final e = engine;
+    return e is UnavailableEngine ? e.reason : '';
+  }
+
+  bool _blocked() {
+    final reason = unavailable;
+    if (reason.isEmpty) return false;
+    onBlocked?.call(reason);
+    return true;
+  }
+
   void togglePlay() {
+    if (_blocked()) return;
     if (track == null) {
       play(sourceWave);
       return;
     }
     playing ? engine.pause() : engine.play();
+  }
+
+  void resume() {
+    if (track != null && !playing) engine.play();
+  }
+
+  void pause() {
+    if (playing) engine.pause();
   }
 
   void nextTrack() {
@@ -472,10 +495,13 @@ class PlayerState extends ChangeNotifier {
 
   void setQuality(PlayQuality q) => _send({'cmd': 'playerQuality', 'quality': q.name});
 
-  void play(String source, {String? track, int index = 0}) =>
-      _send({'cmd': 'play', 'source': source, 'track': ?track, 'index': index});
+  void play(String source, {String? track, int index = 0}) {
+    if (_blocked()) return;
+    _send({'cmd': 'play', 'source': source, 'track': ?track, 'index': index});
+  }
 
   void playShuffled(String source) {
+    if (_blocked()) return;
     if (!shuffle) _send({'cmd': 'playerShuffle', 'on': true});
     _send({'cmd': 'play', 'source': source, 'index': -1});
   }

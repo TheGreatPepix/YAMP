@@ -8,6 +8,7 @@ import 'core/core.dart';
 import 'core/fake_core.dart';
 import 'desktop.dart';
 import 'player/engine.dart';
+import 'player/system_media.dart';
 import 'state/controller.dart';
 
 Future<void> main(List<String> args) async {
@@ -15,8 +16,7 @@ Future<void> main(List<String> args) async {
   final exe = Platform.resolvedExecutable;
   final Core core;
   final demo = args.contains('--demo') || const bool.fromEnvironment('YMD_DEMO');
-  if (!demo) MediaKitEngine.init();
-  final AudioEngine engine = demo ? SilentEngine(tick: const Duration(milliseconds: 250)) : MediaKitEngine();
+  final engine = demo ? SilentEngine(tick: const Duration(milliseconds: 250)) : _engine();
   if (demo) {
     core = FakeCore();
   } else if (Platform.isAndroid) {
@@ -25,7 +25,23 @@ Future<void> main(List<String> args) async {
     final path = Platform.environment['YMCORE'] ?? ProcessCore.beside(exe);
     core = path == null ? _MissingCore() : await ProcessCore.start(path);
   }
-  runApp(YmdApp(controller: Controller(core, desktop: Desktop(args: args), engine: engine)));
+  final controller = Controller(core, desktop: Desktop(args: args), engine: engine);
+  if (Platform.isAndroid && !demo) SystemMedia(controller.player);
+  runApp(YmdApp(controller: controller));
+}
+
+AudioEngine _engine() {
+  try {
+    MediaKitEngine.init();
+    return MediaKitEngine();
+  } catch (e) {
+    return UnavailableEngine(
+      Platform.isLinux
+          ? 'Для воспроизведения нужна библиотека libmpv. Установите пакет libmpv2 или libmpv1 '
+                '(Debian, Ubuntu), mpv-libs (Fedora) или mpv (Arch) и перезапустите YAMD'
+          : 'Плеер не запустился: $e',
+    );
+  }
 }
 
 class _MissingCore implements Core {
