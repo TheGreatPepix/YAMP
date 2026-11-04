@@ -11,6 +11,13 @@ final _linkToken = RegExp(r'yandex\.|://');
 
 bool looksLikeLinks(String text) => _linkToken.hasMatch(text);
 
+final _separators = RegExp(r'[\s,;]+');
+
+List<String> splitLinks(String text) => {
+  for (final t in text.split(_separators))
+    if (t.contains('yandex.') || t.contains('://')) t,
+}.toList();
+
 class SearchHit {
   SearchHit.fromJson(Map<String, dynamic> j)
     : kind = ReleaseKind.parse(j['kind']),

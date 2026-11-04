@@ -2,16 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../state/controller.dart';
-import '../state/draft.dart';
 import '../state/search.dart';
 import '../theme.dart';
 import 'widgets.dart';
 
 class LinkInput extends StatefulWidget {
-  const LinkInput({super.key, required this.c, this.hero = false});
+  const LinkInput({super.key, required this.c});
 
   final Controller c;
-  final bool hero;
 
   @override
   State<LinkInput> createState() => _LinkInputState();
@@ -29,17 +27,20 @@ class _LinkInputState extends State<LinkInput> {
     super.dispose();
   }
 
+  void _open(String text) {
+    _input.clear();
+    c.openLinks(text);
+  }
+
+  void _find(String text) {
+    c.openSearch();
+    c.search.run(text);
+  }
+
   void _submit() {
     final text = _input.text;
     if (text.trim().isEmpty) return;
-    if (!looksLikeLinks(text)) {
-      c.search.run(text);
-      return;
-    }
-    _input.clear();
-    c.search.close();
-    c.addLinks(text);
-    _focus.requestFocus();
+    looksLikeLinks(text) ? _open(text) : _find(text);
   }
 
   void _clear() {
@@ -48,27 +49,29 @@ class _LinkInputState extends State<LinkInput> {
     _focus.requestFocus();
   }
 
+  void _changed(String text) {
+    if (text.trim().isNotEmpty && !looksLikeLinks(text)) c.openSearch();
+  }
+
   Future<void> _paste() async {
     final data = await Clipboard.getData(Clipboard.kTextPlain);
     final text = (data?.text ?? '').trim();
     if (text.isEmpty) return;
     if (looksLikeLinks(text)) {
-      c.addLinks(text);
+      _open(text);
       return;
     }
     _input.text = text;
     _input.selection = TextSelection.collapsed(offset: text.length);
-    c.search.run(text);
+    _find(text);
   }
 
   Future<void> _pasteInline() async {
     final data = await Clipboard.getData(Clipboard.kTextPlain);
     final text = (data?.text ?? '').trim();
     if (text.isEmpty) return;
-    final links = splitLinks(text);
-    final link = looksLikeLinks(text);
-    if (link && (text.contains('\n') || links.length > 1 || _input.text.trim().isEmpty)) {
-      c.addLinks(text);
+    if (looksLikeLinks(text) && _input.text.trim().isEmpty) {
+      _open(text);
       return;
     }
     final v = _input.value;
@@ -77,13 +80,13 @@ class _LinkInputState extends State<LinkInput> {
       text: v.text.replaceRange(sel.start, sel.end, text),
       selection: TextSelection.collapsed(offset: sel.start + text.length),
     );
+    _changed(_input.text);
   }
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final accent = context.status.accent;
-    final hero = widget.hero;
     final phone = MediaQuery.sizeOf(context).width < phoneWidth;
     return ListenableBuilder(
       listenable: _input,
@@ -91,82 +94,36 @@ class _LinkInputState extends State<LinkInput> {
         final text = _input.text.trim();
         final empty = text.isEmpty;
         final link = looksLikeLinks(text);
-        final icon = empty
-            ? Icons.content_paste_rounded
-            : link
-            ? Icons.add_rounded
-            : Icons.search_rounded;
-        final Widget action = hero && phone
-            ? Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: IconButton.filled(
-                  tooltip: empty
-                      ? 'Вставить'
-                      : link
-                      ? 'Добавить'
-                      : 'Найти',
+        final Widget action = Padding(
+          padding: const EdgeInsets.only(right: 6),
+          child: empty
+              ? IconButton(
+                  tooltip: 'Вставить',
+                  icon: const Icon(Icons.content_paste_rounded, size: 20),
+                  onPressed: _paste,
+                )
+              : !link
+              ? IconButton(
+                  tooltip: 'Очистить',
+                  icon: const Icon(Icons.close_rounded, size: 20),
+                  onPressed: _clear,
+                )
+              : IconButton.filled(
+                  tooltip: 'Открыть',
                   style: IconButton.styleFrom(
-                    minimumSize: const Size(52, 44),
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                    backgroundColor: scheme.primary,
+                    foregroundColor: scheme.onPrimary,
+                    shape: const CircleBorder(),
+                    fixedSize: const Size(32, 32),
+                    minimumSize: const Size(32, 32),
+                    padding: EdgeInsets.zero,
                   ),
-                  onPressed: empty ? _paste : _submit,
-                  icon: Icon(icon, size: 20),
+                  iconSize: 20,
+                  icon: const Icon(Icons.arrow_forward_rounded),
+                  onPressed: _submit,
                 ),
-              )
-            : hero
-            ? Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: FilledButton.icon(
-                  style: FilledButton.styleFrom(minimumSize: const Size(0, 44)),
-                  onPressed: empty ? _paste : _submit,
-                  icon: Icon(
-                    empty
-                        ? Icons.content_paste_rounded
-                        : link
-                        ? Icons.add_rounded
-                        : Icons.search_rounded,
-                    size: 18,
-                  ),
-                  label: Text(
-                    empty
-                        ? 'Вставить'
-                        : link
-                        ? 'Добавить'
-                        : 'Найти',
-                  ),
-                ),
-              )
-            : Padding(
-                padding: const EdgeInsets.only(right: 6),
-                child: empty
-                    ? IconButton(
-                        tooltip: 'Вставить',
-                        icon: const Icon(Icons.content_paste_rounded, size: 20),
-                        onPressed: _paste,
-                      )
-                    : !link
-                    ? IconButton(
-                        tooltip: 'Очистить',
-                        icon: const Icon(Icons.close_rounded, size: 20),
-                        onPressed: _clear,
-                      )
-                    : IconButton.filled(
-                        tooltip: 'Добавить',
-                        style: IconButton.styleFrom(
-                          backgroundColor: scheme.primary,
-                          foregroundColor: scheme.onPrimary,
-                          shape: const CircleBorder(),
-                          fixedSize: const Size(32, 32),
-                          minimumSize: const Size(32, 32),
-                          padding: EdgeInsets.zero,
-                        ),
-                        iconSize: 20,
-                        icon: const Icon(Icons.add_rounded),
-                        onPressed: _submit,
-                      ),
-              );
-        final radius = BorderRadius.circular(hero ? 16 : 12);
+        );
+        final radius = BorderRadius.circular(12);
         return CallbackShortcuts(
           bindings: {
             const SingleActivator(LogicalKeyboardKey.escape): () {
@@ -188,23 +145,22 @@ class _LinkInputState extends State<LinkInput> {
               autofocus: !phone,
               textInputAction: TextInputAction.search,
               onSubmitted: (_) => _submit(),
-              style: TextStyle(fontSize: hero ? 16 : 14),
+              onChanged: _changed,
+              onTap: () {
+                if (c.search.open) c.openSearch();
+              },
+              style: const TextStyle(fontSize: 14),
               decoration: InputDecoration(
-                hintText: hero
-                    ? 'Ссылка или название трека, альбома, исполнителя'
-                    : 'Ссылки или поиск по Яндекс Музыке',
-                prefixIcon: Padding(
-                  padding: EdgeInsets.only(left: hero ? 8 : 0),
-                  child: Icon(link ? Icons.link_rounded : Icons.search_rounded),
-                ),
+                hintText: 'Трек, альбом, исполнитель или ссылка',
+                prefixIcon: Icon(link ? Icons.link_rounded : Icons.search_rounded),
                 suffixIcon: action,
-                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: hero ? 22 : 12),
-                isDense: !hero,
-                fillColor: hero ? scheme.surfaceContainerHigh : scheme.surfaceContainer,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                isDense: true,
+                fillColor: scheme.surfaceContainer,
                 border: OutlineInputBorder(borderRadius: radius, borderSide: BorderSide.none),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: radius,
-                  borderSide: BorderSide(color: hero ? accent : scheme.outlineVariant, width: hero ? 1.5 : 1),
+                  borderSide: BorderSide(color: scheme.outlineVariant),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: radius,

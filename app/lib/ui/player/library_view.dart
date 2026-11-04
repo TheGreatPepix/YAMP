@@ -4,6 +4,7 @@ import '../../state/controller.dart';
 import '../../state/models.dart';
 import '../../state/player.dart';
 import '../../theme.dart';
+import '../download_menu.dart';
 import '../widgets.dart';
 import 'artist_view.dart';
 import 'controls.dart';
@@ -620,6 +621,13 @@ class ListHeader extends StatelessWidget {
                 icon: const Icon(Icons.shuffle_rounded, size: 18),
                 label: const Text('Вперемешку'),
               ),
+              if (!top)
+                DownloadButton(
+                  download: (link, q, name) => c.download(link, q, title: name),
+                  link: liked ? sourceLiked : source,
+                  title: title,
+                  label: artist ? 'Скачать дискографию' : 'Скачать',
+                ),
             ],
           ),
         ],
@@ -750,7 +758,6 @@ class _More extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = c.player;
     final disliked = p.disliked(track);
-    final inDrafts = track.link.isNotEmpty && c.draftFor(track.link) != null;
     final pages = track.unavailable ? const <Widget>[] : pageItems(track, c.openPage, here: here);
     return MenuAnchor(
       menuChildren: [
@@ -762,11 +769,10 @@ class _More extends StatelessWidget {
             onPressed: () => p.like(track, !p.liked(track)),
             child: Text(p.liked(track) ? 'Убрать из «Мне нравится»' : 'Мне нравится'),
           ),
-        MenuItemButton(
-          leadingIcon: Icon(inDrafts ? Icons.check_rounded : Icons.add_rounded),
-          onPressed: track.link.isEmpty || inDrafts ? null : () => c.addLinks(track.link),
-          child: Text(inDrafts ? 'Уже в подборке' : 'Добавить в подборку'),
-        ),
+        if (!track.unavailable) ...[
+          ...downloadItems((link, q, name) => c.download(link, q, title: name), track.link, track.title),
+          const Divider(height: 8),
+        ],
         MenuItemButton(
           leadingIcon: Icon(disliked ? Icons.thumb_down_alt_rounded : Icons.thumb_down_off_alt_rounded),
           onPressed: () => p.dislike(track, !disliked),

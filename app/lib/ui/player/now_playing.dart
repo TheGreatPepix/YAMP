@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../state/models.dart';
 import '../../state/player.dart';
 import '../../theme.dart';
+import '../download_menu.dart';
 import '../widgets.dart';
 import 'controls.dart';
 
@@ -10,13 +11,41 @@ const _rowExtent = 56.0;
 const _wideFrom = 900.0;
 
 class NowPlaying extends StatelessWidget {
-  const NowPlaying({super.key, required this.p, required this.phone, required this.onOpen});
+  const NowPlaying({super.key, required this.p, required this.phone, required this.onOpen, this.onDownload});
 
   final PlayerState p;
   final bool phone;
   final OpenPage onOpen;
+  final Download? onDownload;
 
   void _close() => p.panelOpen.value = false;
+
+  void _openQueue(BuildContext context) {
+    final d = motion(context, const Duration(milliseconds: 260));
+    showGeneralDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Закрыть очередь',
+      barrierColor: Colors.black54,
+      transitionDuration: d,
+      pageBuilder: (context, _, _) => _QueueFlyout(
+        p: p,
+        onOpen: phone
+            ? null
+            : (source) {
+                Navigator.of(context).pop();
+                onOpen(source);
+              },
+      ),
+      transitionBuilder: (context, animation, _, child) => SlideTransition(
+        position: Tween(
+          begin: const Offset(1, 0),
+          end: Offset.zero,
+        ).animate(CurvedAnimation(parent: animation, curve: const Cubic(0.2, 0, 0, 1))),
+        child: child,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -29,25 +58,23 @@ class NowPlaying extends StatelessWidget {
             final wide = !phone && box.maxWidth >= _wideFrom;
             final side = phone ? 16.0 : 24.0;
             if (!wide) {
-              return _QueueScroll(
-                p: p,
-                side: side,
-                onOpen: phone ? null : onOpen,
-                leading: ListenableBuilder(
+              return SingleChildScrollView(
+                padding: EdgeInsets.symmetric(horizontal: side),
+                child: ListenableBuilder(
                   listenable: p,
                   builder: (context, _) {
                     final t = p.track;
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        _Header(p: p, onClose: _close, onOpen: onOpen),
+                        _Header(p: p, onClose: _close, onOpen: onOpen, onQueue: () => _openQueue(context)),
                         if (t == null)
                           const _Waiting()
                         else
                           Center(
                             child: ConstrainedBox(
                               constraints: const BoxConstraints(maxWidth: 560),
-                              child: _Main(p: p, track: t, phone: phone, onOpen: onOpen),
+                              child: _Main(p: p, track: t, phone: phone, onOpen: onOpen, onDownload: onDownload),
                             ),
                           ),
                         const SizedBox(height: 24),
@@ -85,7 +112,7 @@ class NowPlaying extends StatelessWidget {
                                         final t = p.track;
                                         return t == null
                                             ? const _Waiting()
-                                            : _Main(p: p, track: t, phone: false, art: art, onOpen: onOpen);
+                                            : _Main(p: p, track: t, phone: false, art: art, onOpen: onOpen, onDownload: onDownload);
                                       },
                                     ),
                                   ),
@@ -119,6 +146,48 @@ class NowPlaying extends StatelessWidget {
   }
 }
 
+class _QueueFlyout extends StatelessWidget {
+  const _QueueFlyout({required this.p, this.onOpen});
+
+  final PlayerState p;
+  final OpenPage? onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final width = (MediaQuery.sizeOf(context).width * 0.9).clamp(0.0, 420.0);
+    return Align(
+      alignment: Alignment.centerRight,
+      child: SizedBox(
+        width: width,
+        height: double.infinity,
+        child: Material(
+          color: scheme.surfaceContainerLow,
+          borderRadius: const BorderRadius.horizontal(left: Radius.circular(18)),
+          clipBehavior: Clip.antiAlias,
+          child: SafeArea(
+            left: false,
+            child: Stack(
+              children: [
+                FocusTraversalGroup(child: _QueueScroll(p: p, side: 12, top: 22, onOpen: onOpen)),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: IconButton(
+                    tooltip: 'Закрыть очередь',
+                    icon: const Icon(Icons.close_rounded),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _Waiting extends StatelessWidget {
   const _Waiting();
 
@@ -132,12 +201,11 @@ class _Waiting extends StatelessWidget {
 }
 
 class _QueueScroll extends StatefulWidget {
-  const _QueueScroll({required this.p, required this.side, this.leading, this.top = 0, this.onOpen});
+  const _QueueScroll({required this.p, required this.side, this.top = 0, this.onOpen});
 
   final PlayerState p;
   final double side, top;
   final OpenPage? onOpen;
-  final Widget? leading;
 
   @override
   State<_QueueScroll> createState() => _QueueScrollState();
@@ -154,7 +222,7 @@ class _QueueScrollState extends State<_QueueScroll> {
   void initState() {
     super.initState();
     p.addListener(_changed);
-    if (widget.leading == null) WidgetsBinding.instance.addPostFrameCallback((_) => _reveal());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _reveal());
   }
 
   @override
@@ -217,9 +285,8 @@ class _QueueScrollState extends State<_QueueScroll> {
                   key: _head,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    ?widget.leading,
                     Padding(
-                      padding: EdgeInsets.symmetric(horizontal: widget.leading == null ? 6 : 0),
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
                       child: Row(
                         children: [
                           Semantics(
@@ -272,11 +339,12 @@ class _QueueScrollState extends State<_QueueScroll> {
 }
 
 class _Header extends StatelessWidget {
-  const _Header({required this.p, required this.onClose, required this.onOpen});
+  const _Header({required this.p, required this.onClose, required this.onOpen, this.onQueue});
 
   final PlayerState p;
   final VoidCallback onClose;
   final OpenPage onOpen;
+  final VoidCallback? onQueue;
 
   @override
   Widget build(BuildContext context) {
@@ -312,7 +380,10 @@ class _Header extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 48),
+              if (onQueue == null)
+                const SizedBox(width: 48)
+              else
+                IconButton(tooltip: 'Очередь', icon: const Icon(Icons.queue_music_rounded), onPressed: onQueue),
             ],
           ),
         );
@@ -322,12 +393,20 @@ class _Header extends StatelessWidget {
 }
 
 class _Main extends StatelessWidget {
-  const _Main({required this.p, required this.track, required this.phone, required this.onOpen, this.art});
+  const _Main({
+    required this.p,
+    required this.track,
+    required this.phone,
+    required this.onOpen,
+    this.onDownload,
+    this.art,
+  });
 
   final PlayerState p;
   final PlayTrack track;
   final bool phone;
   final OpenPage onOpen;
+  final Download? onDownload;
   final double? art;
 
   @override
@@ -357,6 +436,13 @@ class _Main extends StatelessWidget {
                 ),
                 if (p.wave) DislikeButton(p: p, track: track, size: 44),
                 LikeButton(p: p, track: track, size: 44),
+                if (onDownload != null)
+                  DownloadButton(
+                    download: onDownload!,
+                    link: track.link,
+                    title: track.title,
+                    size: 44,
+                  ),
                 _PageMenu(track: track, onOpen: onOpen),
               ],
             ),

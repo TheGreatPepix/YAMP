@@ -57,6 +57,7 @@ type job struct {
 	Message string
 
 	sel       yam.Selection
+	quality   yam.Quality
 	tracks    []*trackState
 	cancel    context.CancelFunc
 	dirty     bool
@@ -89,7 +90,7 @@ func (m *manager) add(sess *yam.Session, link string, sel yam.Selection, root st
 	ctx, cancel := context.WithCancel(context.Background())
 	m.mu.Lock()
 	m.nextID++
-	j := &job{ID: m.nextID, Link: link, sel: sel, Status: jobResolving, cancel: cancel, dirty: true}
+	j := &job{ID: m.nextID, Link: link, sel: sel, quality: q, Status: jobResolving, cancel: cancel, dirty: true}
 	m.jobs = append(m.jobs, j)
 	m.mu.Unlock()
 	m.flush()
@@ -110,12 +111,7 @@ func (m *manager) run(ctx context.Context, j *job, sess *yam.Session, root strin
 		fail(err)
 		return
 	}
-	link, err := yam.ParseLink(j.Link)
-	if err != nil {
-		fail(err)
-		return
-	}
-	rel, err := sess.ResolveSelected(ctx, link, j.sel)
+	rel, err := resolveJob(ctx, sess, j)
 	if err != nil {
 		fail(err)
 		return
@@ -151,6 +147,17 @@ func (m *manager) run(ctx context.Context, j *job, sess *yam.Session, root strin
 	}
 	wg.Wait()
 	m.finish(j, ctx.Err())
+}
+
+func resolveJob(ctx context.Context, sess *yam.Session, j *job) (*yam.Release, error) {
+	if j.Link == yam.LikedLink {
+		return sess.ResolveLiked(ctx, sess.Account().UID)
+	}
+	link, err := yam.ParseLink(j.Link)
+	if err != nil {
+		return nil, err
+	}
+	return sess.ResolveSelected(ctx, link, j.sel)
 }
 
 func (m *manager) downloadTrack(ctx context.Context, sess *yam.Session, j *job, i int, rel *yam.Release, t yam.Track, root string, q yam.Quality) {
@@ -281,6 +288,9 @@ func (m *manager) retry(sess *yam.Session, id int, root string, q yam.Quality) {
 	var sel yam.Selection
 	if j != nil && j.finished() {
 		link, sel = j.Link, j.sel
+		if j.quality != "" {
+			q = j.quality
+		}
 	}
 	m.mu.Unlock()
 	if link != "" {

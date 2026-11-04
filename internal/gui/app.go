@@ -234,7 +234,7 @@ func (g *App) recheck() {
 	}()
 }
 
-func (g *App) startDownload(link, dir string, sel yam.Selection) {
+func (g *App) startDownload(link, dir string, sel yam.Selection, quality string) {
 	g.mu.Lock()
 	sess := g.session
 	if dir == "" {
@@ -242,6 +242,10 @@ func (g *App) startDownload(link, dir string, sel yam.Selection) {
 	}
 	q := g.cfg.quality()
 	g.mu.Unlock()
+	switch yam.Quality(quality) {
+	case yam.Lossless, yam.MP3:
+		q = yam.Quality(quality)
+	}
 
 	if sess == nil {
 		g.notice(yam.ErrNoPlus.Error(), "error")
@@ -251,9 +255,11 @@ func (g *App) startDownload(link, dir string, sel yam.Selection) {
 		g.notice("Идёт обновление YAMP", "error")
 		return
 	}
-	if _, err := yam.ParseLink(link); err != nil {
-		g.notice(err.Error(), "error")
-		return
+	if link != yam.LikedLink {
+		if _, err := yam.ParseLink(link); err != nil {
+			g.notice(err.Error(), "error")
+			return
+		}
 	}
 	if dir == "" {
 		g.notice("Укажите папку для сохранения", "error")

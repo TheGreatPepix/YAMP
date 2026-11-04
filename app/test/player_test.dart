@@ -62,9 +62,7 @@ void main() {
   testWidgets('слушать: библиотека, волна, лайк, переходы и конец трека', (tester) async {
     final (core, c, engine) = await _open(tester);
 
-    await tester.tap(find.text('Слушать'));
-    await _settle(tester);
-    expect(c.section.value, Section.listen);
+    expect(c.section.value, Section.home);
     expect(find.text('Моя волна'), findsOneWidget);
     expect(find.text('Мне нравится'), findsWidgets);
     expect(find.text('Дорога'), findsOneWidget);
@@ -108,8 +106,6 @@ void main() {
 
   testWidgets('плейлист: запуск трека, повтор, качество, панель плеера и Esc', (tester) async {
     final (core, c, engine) = await _open(tester);
-    await tester.tap(find.text('Слушать'));
-    await _settle(tester);
 
     await tester.tap(find.text('Дорога'));
     await _settle(tester);
@@ -171,8 +167,6 @@ void main() {
 
   testWidgets('горячие клавиши: пробел, Ctrl+стрелки и медиаклавиши', (tester) async {
     final (core, c, engine) = await _open(tester);
-    await tester.tap(find.text('Слушать'));
-    await _settle(tester);
     await tester.tap(find.text('Дорога'));
     await _settle(tester);
     await tester.tap(find.widgetWithText(FilledButton, 'Слушать'));
@@ -205,8 +199,6 @@ void main() {
 
   testWidgets('пустой плейлист предлагает Мою волну', (tester) async {
     final (core, c, _) = await _open(tester);
-    await tester.tap(find.text('Слушать'));
-    await _settle(tester);
     await tester.tap(find.text('Пустой'));
     await _settle(tester);
     expect(find.text('В этом плейлисте пока нет треков'), findsOneWidget);
@@ -221,8 +213,6 @@ void main() {
     testWidgets('телефон ${size.width.round()}: навигация снизу, мини-плеер и полный экран', (tester) async {
       final (core, c, _) = await _open(tester, size: size);
 
-      await tester.tap(find.text('Слушать'));
-      await _settle(tester);
       expect(find.byType(NavigationBar), findsOneWidget);
       await tester.tap(find.text('Моя волна'));
       await _settle(tester);
@@ -232,6 +222,13 @@ void main() {
       await _settle(tester);
       expect(find.text('Сейчас играет'), findsOneWidget);
       expect(_tip('Свернуть плеер'), findsOneWidget);
+      expect(find.byType(QueueRow), findsNothing);
+      await tester.tap(_tip('Очередь'));
+      await _settle(tester);
+      expect(find.byType(QueueRow), findsWidgets);
+      await tester.tap(_tip('Закрыть очередь'));
+      await _settle(tester);
+      expect(find.byType(QueueRow), findsNothing);
 
       final popped = await tester.binding.handlePopRoute();
       await _settle(tester);
@@ -244,10 +241,15 @@ void main() {
       await tester.tap(_tip('К библиотеке'));
       await _settle(tester);
 
-      await tester.tap(find.text('Скачать'));
+      await tester.tap(find.text('Поиск'));
       await _settle(tester);
-      expect(c.section.value, Section.download);
+      expect(c.section.value, Section.search);
+      expect(find.text('Найдите музыку'), findsOneWidget);
       expect(find.bySemanticsLabel(RegExp('^Открыть плеер')), findsWidgets);
+      final back = await tester.binding.handlePopRoute();
+      await _settle(tester);
+      expect(back, isTrue);
+      expect(c.section.value, Section.home);
 
       await core.close();
     });
@@ -264,14 +266,11 @@ void main() {
     await _settle(tester);
     expect(c.player.hasTrack, isTrue);
     expect(engine.isPlaying, isTrue);
-    expect(c.drafts.value, isEmpty);
     await core.close();
   });
 
   testWidgets('ошибки: три подряд останавливают плеер, ошибка посреди трека не перескакивает', (tester) async {
     final (core, c, engine) = await _open(tester);
-    await tester.tap(find.text('Слушать'));
-    await _settle(tester);
     await tester.tap(find.text('Дорога'));
     await _settle(tester);
     await tester.tap(find.widgetWithText(FilledButton, 'Слушать'));
@@ -300,10 +299,8 @@ void main() {
     await core.close();
   });
 
-  testWidgets('поиск в разделе Слушать: трек играет, исполнитель и альбом открываются страницами', (tester) async {
+  testWidgets('поиск: трек играет, исполнитель и альбом открываются страницами', (tester) async {
     final (core, c, engine) = await _open(tester);
-    await tester.tap(find.text('Слушать'));
-    await _settle(tester);
     await tester.enterText(find.byType(TextField), 'кино');
     await tester.pump(const Duration(milliseconds: 450));
     await tester.pump(const Duration(milliseconds: 250));
@@ -311,13 +308,12 @@ void main() {
 
     await tester.tap(find.text('Война'));
     await _settle(tester);
-    expect(c.drafts.value, isEmpty);
     expect(c.player.hasTrack, isTrue);
     expect(engine.isPlaying, isTrue);
 
-    await tester.tap(find.byType(BestCard));
+    await tester.tap(find.descendant(of: find.byType(BestCard), matching: find.text('Кино')).first);
     await _settle(tester);
-    expect(c.search.open, isFalse);
+    expect(c.section.value, Section.home);
     expect(find.text('ИСПОЛНИТЕЛЬ'), findsOneWidget);
     expect(find.text('Популярные треки'), findsOneWidget);
     await tester.scrollUntilVisible(find.text('1988 · Альбом'), 200, scrollable: find.byType(Scrollable).last);
@@ -340,7 +336,6 @@ void main() {
     await tester.tap(find.text('Дорога'));
     await _settle(tester);
     expect(find.text('Назад'), findsNothing);
-    expect(c.drafts.value, isEmpty);
     await core.close();
   });
 
@@ -349,14 +344,14 @@ void main() {
     c.player.play(fakePlaylist);
     await _settle(tester);
     expect(c.player.track!.title, 'Звезда по имени Солнце');
-    expect(c.section.value, Section.download);
+    expect(c.section.value, Section.home);
 
     c.player.panelOpen.value = true;
     await _settle(tester);
     await _tapLink(tester, _panel(_link('Кино')));
     await _settle(tester);
     expect(c.player.panelOpen.value, isFalse);
-    expect(c.section.value, Section.listen);
+    expect(c.section.value, Section.home);
     expect(c.player.browse.value, fakeArtist('Кино'));
     expect(find.text('ИСПОЛНИТЕЛЬ'), findsOneWidget);
     expect(find.text('Назад'), findsNothing);
@@ -468,8 +463,6 @@ void main() {
 
   testWidgets('выход из аккаунта останавливает плеер', (tester) async {
     final (core, c, engine) = await _open(tester);
-    await tester.tap(find.text('Слушать'));
-    await _settle(tester);
     await tester.tap(find.text('Моя волна'));
     await _settle(tester);
     expect(engine.isPlaying, isTrue);
@@ -496,7 +489,7 @@ void main() {
       await tester.tap(find.text('Войти'));
       await tester.pump(const Duration(milliseconds: 600));
       await tester.pumpAndSettle();
-      c.listen();
+      c.home();
       await tester.pumpAndSettle();
       if (wave) {
         c.player.play('wave');

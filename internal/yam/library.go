@@ -51,6 +51,27 @@ func (c *Client) LikedTrackIDs(ctx context.Context, uid int64) ([]string, error)
 	return c.trackRefs(ctx, userPath(uid)+"/likes/tracks")
 }
 
+const LikedLink = "liked"
+
+func (c *Client) ResolveLiked(ctx context.Context, uid int64) (*Release, error) {
+	ids, err := c.LikedTrackIDs(ctx, uid)
+	if err != nil {
+		return nil, err
+	}
+	list, err := c.fetchTracks(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	r := &Release{Kind: KindPlaylist, Title: "Мне нравится"}
+	for _, t := range list {
+		if tr := t.shape(nil); tr.ID != "" {
+			r.Tracks = append(r.Tracks, tr)
+		}
+	}
+	r.TrackCount = len(r.Tracks)
+	return r, nil
+}
+
 func (c *Client) DislikedTrackIDs(ctx context.Context, uid int64) ([]string, error) {
 	return c.trackRefs(ctx, userPath(uid)+"/dislikes/tracks")
 }

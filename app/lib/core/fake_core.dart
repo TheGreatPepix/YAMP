@@ -161,32 +161,11 @@ class FakeCore implements Core {
         if (c['quality'] case final String q when q.isNotEmpty) _quality = q;
         if (c['concurrency'] case final int n when n > 0) _concurrency = n;
         _emit(_state());
-      case 'preview':
-        _preview('${c['link']}');
       case 'download':
         lastDownload = c;
-        _download('${c['link']}', c['select'] as List?);
+        _download('${c['link']}');
       case 'search':
         _search(c);
-      case 'album':
-        final id = '${c['album']}';
-        final count = _albumCount(id);
-        _later(const Duration(milliseconds: 200), () {
-          _emit({
-            'type': 'albumTracks',
-            'id': id,
-            'tracks': [
-              for (var i = 0; i < count; i++)
-                {
-                  'id': '$id${i + 1}',
-                  'title': _titles[i % _titles.length],
-                  'artist': id.startsWith('playlist:') && i.isOdd ? 'Аквариум' : 'Кино',
-                  'number': i + 1,
-                  'explicit': i.isOdd,
-                },
-            ],
-          });
-        });
       case 'cancel':
         final id = c['id'] as int? ?? 0;
         for (final j in _jobs.values) {
@@ -196,7 +175,7 @@ class FakeCore implements Core {
         final j = _jobs.remove(c['id']);
         if (j != null) {
           _emit({'type': 'jobRemoved', 'id': j.id});
-          _download(j.link, null);
+          _download(j.link);
         }
       case 'remove':
         final id = c['id'] as int? ?? 0;
@@ -222,6 +201,7 @@ class FakeCore implements Core {
       };
 
   static (String, String, String, int, int) _release(String link) {
+    if (link == 'liked') return ('playlist', 'Мне нравится', 'Иван Петров', 0, 6);
     if (link.contains('/artist/')) return ('artist', 'Кино', 'Кино', 0, 12);
     if (link.contains('/playlists/')) return ('playlist', 'Плейлист дня', 'Иван Петров', 0, 6);
     if (link.contains('/track/')) return ('track', 'Кукушка', 'Кино', 1990, 1);
@@ -328,68 +308,8 @@ class FakeCore implements Core {
     });
   }
 
-  void _preview(String link) {
-    if (link.isEmpty) return;
-    if (!link.contains('yandex') && int.tryParse(link) == null) {
-      _emit({
-        'type': 'preview',
-        'link': link,
-        'status': 'error',
-        'message': 'Не удалось распознать ссылку.',
-      });
-      return;
-    }
+  void _download(String link) {
     final (kind, title, artist, year, count) = _release(link);
-    _emit({'type': 'preview', 'link': link, 'status': 'loading', 'kind': kind});
-    _later(const Duration(milliseconds: 300), () {
-      _emit({
-        'type': 'preview',
-        'link': link,
-        'status': 'ok',
-        'kind': kind,
-        'title': title,
-        'artist': artist,
-        'year': year,
-        'cover': '',
-        'count': count,
-        'folder': kind == 'track' ? '' : (kind == 'album' ? '$artist - $title ($year)' : title),
-        if (kind == 'artist') 'albums': _albums,
-        if (kind == 'playlist')
-          'albums': [
-            {'id': 'playlist:$link', 'title': title, 'count': count, 'type': 'album'},
-          ],
-        if (kind == 'album') ...{
-          'explicit': true,
-          'albums': [
-            {
-              'id': _albumId(link),
-              'title': title,
-              'year': year,
-              'count': count,
-              'type': 'album',
-              'explicit': true
-            },
-          ],
-        },
-      });
-    });
-  }
-
-  static String _albumId(String link) => RegExp('/album/([0-9]+)').firstMatch(link)?.group(1) ?? '0';
-
-  static int _albumCount(String id) => id.startsWith('playlist:')
-      ? 6
-      : (_albums.where((a) => a['id'] == id).firstOrNull?['count'] as int?) ?? 8;
-
-  void _download(String link, List? select) {
-    var (kind, title, artist, year, count) = _release(link);
-    if (select != null) {
-      count = 0;
-      for (final s in select.cast<Map>()) {
-        final tracks = s['tracks'] as List?;
-        count += tracks?.length ?? _albumCount('${s['album']}');
-      }
-    }
     final j = _FakeJob(++_nextId, link, kind, title, artist, year, count);
     _jobs[j.id] = j;
     _emit(j.event());

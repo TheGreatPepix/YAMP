@@ -6,13 +6,11 @@ import 'package:flutter/services.dart';
 import '../core/core.dart';
 import '../desktop.dart';
 import '../player/engine.dart';
-import 'draft.dart';
 import 'models.dart';
-import 'picker.dart';
 import 'player.dart';
 import 'search.dart';
 
-enum Section { download, listen }
+enum Section { home, search }
 
 class Controller extends ChangeNotifier {
   Controller(this.core, {Desktop? desktop, AudioEngine? engine})
@@ -57,10 +55,8 @@ class Controller extends ChangeNotifier {
   var updating = false;
   final updateProgress = ValueNotifier<double?>(null);
 
-  final drafts = ValueNotifier<List<Draft>>(const []);
-  final selected = ValueNotifier<Draft?>(null);
   final downloadsOpen = ValueNotifier(false);
-  final section = ValueNotifier(Section.download);
+  final section = ValueNotifier(Section.home);
   final PlayerState player;
   late final search = SearchState(send);
 
@@ -117,147 +113,45 @@ class Controller extends ChangeNotifier {
 
   void logout() {
     search.close();
-    _dropDrafts();
     device.value = const DeviceLogin();
     send({'cmd': 'logout'});
   }
 
-  Draft _newDraft(String link) {
-    send({'cmd': 'preview', 'link': link});
-    return Draft(link);
-  }
-
-  int addLinks(String text) {
-    final list = List.of(drafts.value);
-    var added = 0;
-    Draft? first, existing;
-    for (final link in splitLinks(text)) {
-      final known = list.where((d) => d.link == link).firstOrNull;
-      if (known != null) {
-        existing ??= known;
-        continue;
-      }
-      final d = _newDraft(link);
-      first ??= d;
-      list.add(d);
-      added++;
-    }
-    if (added > 0) {
-      drafts.value = list;
-      selected.value = first;
-    } else if (existing != null) {
-      selected.value = existing;
-      _notices.add(const Notice('Уже в подборке, открыл её'));
-    }
-    return added;
-  }
-
-  Draft? draftFor(String link) => drafts.value.where((d) => d.link == link).firstOrNull;
-
-  void toggleHit(SearchHit hit) {
-    final known = draftFor(hit.link);
-    if (known != null) {
-      removeDraft(known);
+  Future<void> download(String link, Quality quality, {String title = ''}) async {
+    if (link.isEmpty) return;
+    if (!await desktop.storageGranted()) {
+      _notices.add(
+        Notice(
+          'Нужен доступ к файлам, чтобы сохранять музыку',
+          kind: NoticeKind.error,
+          action: 'Разрешить',
+          onAction: desktop.requestStorage,
+        ),
+      );
       return;
     }
-    final d = _newDraft(hit.link);
-    drafts.value = [...drafts.value, d];
-    selected.value = d;
+    send({'cmd': 'download', 'link': link, 'quality': quality.name});
+    final format = quality == Quality.lossless ? 'FLAC' : 'MP3 320';
+    final what = title.isEmpty ? '' : ' «$title»';
+    _notices.add(
+      Notice('Скачиваю$what в $format', action: 'Загрузки', onAction: () => downloadsOpen.value = true),
+    );
   }
 
-  List<Draft> _trash = const [];
-
-  void _flushTrash() {
-    for (final d in _trash) {
-      d.dispose();
+  void openLinks(String text) {
+    final links = splitLinks(text);
+    if (links.isEmpty) return;
+    final link = links.first;
+    search.close();
+    if (_trackLink.hasMatch(link)) {
+      player.play(link);
+    } else {
+      openPage(link);
     }
-    _trash = const [];
+    if (links.length > 1) _notices.add(const Notice('Открыл первую ссылку из вставленных'));
   }
 
-  void _discard(List<Draft> removed, String message) {
-    final before = drafts.value;
-    final was = selected.value;
-    _flushTrash();
-    _trash = removed;
-    final next = [
-      for (final x in before)
-        if (!removed.contains(x)) x,
-    ];
-    drafts.value = next;
-    if (was == null || removed.contains(was)) {
-      final i = was == null ? 0 : before.indexOf(was);
-      selected.value = next.isEmpty ? null : next[i.clamp(0, next.length - 1)];
-    }
-    _notices.add(Notice(message, action: 'Вернуть', onAction: () => _restore(removed, before, was)));
-  }
-
-  void _restore(List<Draft> removed, List<Draft> before, Draft? was) {
-    if (!identical(_trash, removed)) return;
-    _trash = const [];
-    final current = drafts.value;
-    final links = {for (final d in current) d.link};
-    final back = [
-      for (final d in removed)
-        if (!links.contains(d.link)) d,
-    ];
-    for (final d in removed) {
-      if (!back.contains(d)) d.dispose();
-    }
-    drafts.value = [
-      for (final d in before)
-        if (back.contains(d) || current.contains(d)) d,
-      for (final d in current)
-        if (!before.contains(d)) d,
-    ];
-    selected.value = back.contains(was) ? was : (back.firstOrNull ?? selected.value);
-  }
-
-  void removeDraft(Draft d) => _discard([d], 'Убрано из подборки');
-
-  void clearDrafts() {
-    if (drafts.value.isEmpty) return;
-    _discard(List.of(drafts.value), 'Подборка очищена');
-  }
-
-  void _take(Draft d) {
-    final old = drafts.value;
-    final i = old.indexOf(d);
-    final next = [
-      for (final x in old)
-        if (x != d) x,
-    ];
-    drafts.value = next;
-    if (selected.value == d) {
-      selected.value = next.isEmpty ? null : next[i.clamp(0, next.length - 1)];
-    }
-    d.dispose();
-  }
-
-  void _dropDrafts() {
-    final old = drafts.value;
-    drafts.value = const [];
-    selected.value = null;
-    _flushTrash();
-    for (final d in old) {
-      d.dispose();
-    }
-  }
-
-  void downloadDraft(Draft d) {
-    if (!d.ready) return;
-    final select = d.selection;
-    send({'cmd': 'download', 'link': d.link, if (select != null) 'select': select});
-    _take(d);
-    downloadsOpen.value = true;
-  }
-
-  void downloadAll() {
-    for (final d in List.of(drafts.value)) {
-      if (d.ready) downloadDraft(d);
-    }
-  }
-
-  void _loadAlbum(String id) => send({'cmd': 'album', 'album': id});
+  static final _trackLink = RegExp(r'/track/\d+|^\d+$');
 
   void cancel(int id) => send({'cmd': 'cancel', 'id': id});
 
@@ -379,31 +273,27 @@ class Controller extends ChangeNotifier {
     log.value = s;
   }
 
-  void listen() {
-    section.value = Section.listen;
+  void home() {
+    section.value = Section.home;
     player.loadLibrary();
   }
 
+  void openSearch() => section.value = Section.search;
+
   void openPage(String source) {
     if (source.isEmpty) return;
-    final fresh = section.value != Section.listen || !player.browsing.value;
+    final fresh = section.value != Section.home || !player.browsing.value;
     player.panelOpen.value = false;
-    if (search.open) search.close();
-    listen();
+    home();
     player.browseTo(source, fromLibrary: fresh);
   }
 
   void openHit(SearchHit hit) {
-    if (section.value != Section.listen) {
-      toggleHit(hit);
-      return;
-    }
     if (hit.kind == ReleaseKind.track) {
       player.play(hit.link);
       return;
     }
-    search.close();
-    player.browseTo(hit.link);
+    openPage(hit.link);
   }
 
   void _receive(Event ev) {
@@ -429,13 +319,6 @@ class Controller extends ChangeNotifier {
         if (device.value.status == DeviceStatus.idle && ev['status'] != 'done') return;
         device.value = ev['status'] == 'done' ? const DeviceLogin() : DeviceLogin.fromJson(ev, DateTime.now());
         return;
-      case 'preview':
-        final p = Preview.fromJson(ev);
-
-        for (final d in [...drafts.value, ..._trash]) {
-          if (d.link == p.link) d.apply(p, _loadAlbum);
-        }
-        return;
       case 'job':
         final id = (ev['id'] as num).toInt();
         final existing = _jobs[id];
@@ -448,18 +331,6 @@ class Controller extends ChangeNotifier {
         _jobs.remove((ev['id'] as num).toInt())?.dispose();
       case 'search':
         search.receive(ev);
-        return;
-      case 'albumTracks':
-        final id = '${ev['id']}';
-        final tracks = [
-          for (final t in (ev['tracks'] as List? ?? const []))
-            if (t is Map<String, dynamic>) TrackOption.fromJson(t),
-        ];
-        for (final d in [...drafts.value, ..._trash]) {
-          final p = d.picker;
-          if (p == null || !p.isLoading(id)) continue;
-          ev['error'] != null ? p.setError(id, '${ev['error']}') : p.setTracks(id, tracks);
-        }
         return;
       case 'stats':
         stats.value = Stats.fromJson(ev);
@@ -510,12 +381,7 @@ class Controller extends ChangeNotifier {
     for (final j in _jobs.values) {
       j.dispose();
     }
-    for (final d in [...drafts.value, ..._trash]) {
-      d.dispose();
-    }
     search.dispose();
-    drafts.dispose();
-    selected.dispose();
     downloadsOpen.dispose();
     section.dispose();
     player.dispose();

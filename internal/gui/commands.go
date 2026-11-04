@@ -86,7 +86,7 @@ func (g *App) onMessage(message string) {
 				sel[s.Album] = s.Tracks
 			}
 		}
-		g.startDownload(strings.TrimSpace(c.Link), strings.TrimSpace(c.Dir), sel)
+		g.startDownload(strings.TrimSpace(c.Link), strings.TrimSpace(c.Dir), sel, c.Quality)
 	case "album":
 		g.albumTracks(c.Album)
 	case "search":

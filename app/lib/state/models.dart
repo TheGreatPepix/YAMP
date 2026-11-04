@@ -1,7 +1,5 @@
 import 'package:flutter/foundation.dart';
 
-import 'picker.dart';
-
 int _int(Object? v) => v is num ? v.toInt() : 0;
 String _str(Object? v) => v == null ? '' : '$v';
 
@@ -74,53 +72,6 @@ enum ReleaseKind {
 
   static ReleaseKind parse(Object? v) =>
       ReleaseKind.values.firstWhere((k) => k.name == v, orElse: () => ReleaseKind.track);
-}
-
-enum PreviewStatus { loading, ok, error }
-
-class Preview {
-  const Preview({
-    required this.link,
-    required this.status,
-    this.kind = ReleaseKind.track,
-    this.title = '',
-    this.artist = '',
-    this.year = 0,
-    this.cover = '',
-    this.count = 0,
-    this.folder = '',
-    this.message = '',
-    this.albums = const [],
-    this.explicit = false,
-  });
-
-  factory Preview.fromJson(Map<String, dynamic> j) => Preview(
-        link: _str(j['link']),
-        status: PreviewStatus.values.firstWhere(
-          (s) => s.name == j['status'],
-          orElse: () => PreviewStatus.error,
-        ),
-        kind: ReleaseKind.parse(j['kind']),
-        title: _str(j['title']),
-        artist: _str(j['artist']),
-        year: _int(j['year']),
-        cover: _str(j['cover']),
-        count: _int(j['count']),
-        folder: _str(j['folder']),
-        message: _str(j['message']),
-        explicit: j['explicit'] == true,
-        albums: [
-          for (final a in (j['albums'] as List? ?? const []))
-            if (a is Map<String, dynamic>) AlbumOption.fromJson(a),
-        ],
-      );
-
-  final String link, title, artist, cover, folder, message;
-  final PreviewStatus status;
-  final ReleaseKind kind;
-  final int year, count;
-  final List<AlbumOption> albums;
-  final bool explicit;
 }
 
 enum TrackStatus { queued, active, done, skipped, error, cancelled }

@@ -5,6 +5,7 @@ import '../state/controller.dart';
 import '../state/models.dart';
 import '../state/search.dart';
 import '../theme.dart';
+import 'download_menu.dart';
 import 'widgets.dart';
 
 String sectionTitle(ReleaseKind k) => switch (k) {
@@ -41,7 +42,7 @@ class SearchView extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = c.search;
     return ListenableBuilder(
-      listenable: Listenable.merge([s, c.drafts]),
+      listenable: s,
       builder: (context, _) {
         final r = s.results;
         final status = switch (r?.status) {
@@ -358,33 +359,6 @@ class _KindResults extends StatelessWidget {
   }
 }
 
-class _AddButton extends StatelessWidget {
-  const _AddButton({required this.added, required this.onPressed, this.size = 34});
-
-  final bool added;
-  final VoidCallback onPressed;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final accent = context.status.accent;
-    return IconButton(
-      tooltip: added ? 'Убрать из подборки' : 'Добавить в подборку',
-      onPressed: onPressed,
-      style: IconButton.styleFrom(
-        backgroundColor: added ? accent : scheme.surfaceContainerHighest,
-        foregroundColor: added ? scheme.onPrimary : scheme.onSurface,
-        fixedSize: Size.square(size),
-        minimumSize: Size.square(size),
-        padding: EdgeInsets.zero,
-      ),
-      iconSize: size * 0.58,
-      icon: Icon(added ? Icons.check_rounded : Icons.add_rounded),
-    );
-  }
-}
-
 class HitRow extends StatelessWidget {
   const HitRow({super.key, required this.c, required this.hit});
 
@@ -394,9 +368,8 @@ class HitRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final added = c.draftFor(hit.link) != null;
     return Material(
-      color: added ? scheme.surfaceContainerHigh : Colors.transparent,
+      color: Colors.transparent,
       borderRadius: BorderRadius.circular(10),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -452,7 +425,7 @@ class HitRow extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
               ],
-              _AddButton(added: added, onPressed: () => c.toggleHit(hit), size: 30),
+              DownloadButton(download: _download(c), link: hit.link, title: hit.title, size: 34),
             ],
           ),
         ),
@@ -502,14 +475,10 @@ class HitCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final added = c.draftFor(hit.link) != null;
     final artist = hit.kind == ReleaseKind.artist;
     return Material(
-      color: added ? scheme.surfaceContainerHigh : Colors.transparent,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: added ? context.status.accent.withValues(alpha: 0.7) : Colors.transparent, width: 1.5),
-      ),
+      color: Colors.transparent,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         canRequestFocus: false,
@@ -525,7 +494,17 @@ class HitCard extends StatelessWidget {
                   Positioned(
                     right: 6,
                     bottom: 6,
-                    child: _AddButton(added: added, onPressed: () => c.toggleHit(hit)),
+                    child: IconButton.filled(
+                      tooltip: 'Слушать',
+                      onPressed: () => c.player.play(hit.link),
+                      style: IconButton.styleFrom(
+                        fixedSize: const Size.square(36),
+                        minimumSize: const Size.square(36),
+                        padding: EdgeInsets.zero,
+                      ),
+                      iconSize: 22,
+                      icon: const Icon(Icons.play_arrow_rounded),
+                    ),
                   ),
                 ],
               ),
@@ -570,13 +549,12 @@ class BestCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final added = c.draftFor(hit.link) != null;
     final sub = hitSubtitle(hit);
     return Material(
       color: scheme.surfaceContainerLow,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18),
-        side: BorderSide(color: added ? context.status.accent.withValues(alpha: 0.7) : scheme.outlineVariant),
+        side: BorderSide(color: scheme.outlineVariant),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -618,17 +596,18 @@ class BestCard extends StatelessWidget {
                         ),
                       ),
                     const SizedBox(height: 12),
-                    added
-                        ? OutlinedButton.icon(
-                            onPressed: () => c.toggleHit(hit),
-                            icon: const Icon(Icons.check_rounded, size: 18),
-                            label: const Text('Убрать из подборки'),
-                          )
-                        : FilledButton.icon(
-                            onPressed: () => c.toggleHit(hit),
-                            icon: const Icon(Icons.add_rounded, size: 18),
-                            label: Text(isPhone(context) ? 'В подборку' : 'Добавить в подборку'),
-                          ),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 8,
+                      children: [
+                        FilledButton.icon(
+                          onPressed: () => c.player.play(hit.link),
+                          icon: const Icon(Icons.play_arrow_rounded, size: 20),
+                          label: const Text('Слушать'),
+                        ),
+                        DownloadButton(download: _download(c), link: hit.link, title: hit.title),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -639,3 +618,5 @@ class BestCard extends StatelessWidget {
     );
   }
 }
+
+Download _download(Controller c) => (link, q, title) => c.download(link, q, title: title);

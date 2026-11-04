@@ -164,6 +164,11 @@ func TestLibraryCalls(t *testing.T) {
 	if err != nil || strings.Join(disliked, ",") != "12" {
 		t.Fatalf("дизлайки = %v %v", disliked, err)
 	}
+	rel, err := c.ResolveLiked(ctx, 5)
+	if err != nil || rel.Kind != KindPlaylist || rel.Folder() != "Мне нравится" || rel.TrackCount != 2 ||
+		rel.Tracks[0].Title != "T10" || rel.Tracks[1].ID != "11" {
+		t.Fatalf("лайки для загрузки = %+v %v", rel, err)
+	}
 	own, err := c.UserPlaylists(ctx, 5)
 	if err != nil || len(own) != 1 || own[0].Link != webBase+"/users/me/playlists/1001" || own[0].Count != 3 {
 		t.Fatalf("плейлисты = %+v %v", own, err)
