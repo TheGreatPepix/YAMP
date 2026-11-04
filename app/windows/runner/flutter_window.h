@@ -51,7 +51,7 @@ class FlutterWindow : public Win32Window {
   NOTIFYICONDATAW tray_ = {};
   bool tray_added_ = false;
   UINT taskbar_created_ = 0;
-  std::wstring tray_open_ = L"Open YAMD", tray_exit_ = L"Exit";
+  std::wstring tray_open_ = L"Open YAMP", tray_exit_ = L"Exit";
 };
 
 #endif  // RUNNER_FLUTTER_WINDOW_H_

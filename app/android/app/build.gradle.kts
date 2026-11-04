@@ -11,7 +11,7 @@ val signing = Properties().apply {
 }
 
 android {
-    namespace = "ru.yamd.app"
+    namespace = "ru.yamp.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -21,7 +21,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "ru.yamd.app"
+        applicationId = "ru.yamp.app"
         minSdk = 24
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

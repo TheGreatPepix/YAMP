@@ -3,7 +3,7 @@ package player
 import (
 	"math/rand/v2"
 
-	"ymd/internal/yam"
+	"yamp/internal/yam"
 )
 
 type Repeat string

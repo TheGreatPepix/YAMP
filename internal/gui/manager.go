@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"ymd/internal/yam"
+	"yamp/internal/yam"
 )
 
 const (

@@ -31,9 +31,9 @@ func TestUnzipFindsApp(t *testing.T) {
 	root := t.TempDir()
 	archive := filepath.Join(root, "a.zip")
 	makeZip(t, archive, map[string]string{
-		"YAMD/yamd.exe":                  "w",
-		"YAMD/ymcore.exe":                "c",
-		"YAMD/data/flutter_assets/a.bin": "x",
+		"YAMP/yamp.exe":                  "w",
+		"YAMP/ymcore.exe":                "c",
+		"YAMP/data/flutter_assets/a.bin": "x",
 	})
 	out := filepath.Join(root, "out")
 	if err := unzip(archive, out); err != nil {
@@ -43,7 +43,7 @@ func TestUnzipFindsApp(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if app != filepath.Join(out, "YAMD") {
+	if app != filepath.Join(out, "YAMP") {
 		t.Errorf("app = %s", app)
 	}
 	if got := read(t, filepath.Join(app, "data", "flutter_assets", "a.bin")); got != "x" {

@@ -10,7 +10,7 @@ import (
 	"runtime"
 )
 
-const assetName = "YAMD-linux-x86_64.AppImage"
+const assetName = "YAMP-linux-x86_64.AppImage"
 
 func appImage() (string, error) {
 	path := os.Getenv("APPIMAGE")
@@ -42,7 +42,7 @@ func stage(a asset, progress func(done, total int64)) (plan, error) {
 		os.Remove(next)
 		return plan{}, err
 	}
-	tmp, err := os.MkdirTemp("", "ymd-update-")
+	tmp, err := os.MkdirTemp("", "yamp-update-")
 	if err != nil {
 		os.Remove(next)
 		return plan{}, err

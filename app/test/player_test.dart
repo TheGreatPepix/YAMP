@@ -2,17 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:ymd/app.dart';
-import 'package:ymd/core/fake_core.dart';
-import 'package:ymd/core/fake_player.dart';
-import 'package:ymd/player/engine.dart';
-import 'package:ymd/state/controller.dart';
-import 'package:ymd/state/player.dart';
-import 'package:ymd/ui/player/artist_view.dart';
-import 'package:ymd/ui/player/controls.dart';
-import 'package:ymd/ui/player/library_view.dart';
-import 'package:ymd/ui/player/now_playing.dart';
-import 'package:ymd/ui/search_view.dart';
+import 'package:yamp/app.dart';
+import 'package:yamp/core/fake_core.dart';
+import 'package:yamp/core/fake_player.dart';
+import 'package:yamp/player/engine.dart';
+import 'package:yamp/state/controller.dart';
+import 'package:yamp/state/player.dart';
+import 'package:yamp/ui/player/artist_view.dart';
+import 'package:yamp/ui/player/controls.dart';
+import 'package:yamp/ui/player/library_view.dart';
+import 'package:yamp/ui/player/now_playing.dart';
+import 'package:yamp/ui/search_view.dart';
 
 Future<(FakeCore, Controller, SilentEngine)> _open(WidgetTester tester, {Size size = const Size(1280, 860)}) async {
   tester.view.physicalSize = const Size(1280, 860);

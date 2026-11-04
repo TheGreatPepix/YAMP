@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"ymd/internal/yam"
+	"yamp/internal/yam"
 )
 
 func tracks(ids ...string) []yam.Track {

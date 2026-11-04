@@ -1,8 +1,8 @@
-module ymd/mobile
+module yamp/mobile
 
 go 1.26.0
 
-require ymd v0.0.0
+require yamp v0.0.0
 
 require (
 	golang.org/x/mobile v0.0.0-20261011034528-197770444867 // indirect
@@ -11,6 +11,6 @@ require (
 	golang.org/x/tools v0.52.0 // indirect
 )
 
-replace ymd => ../
+replace yamp => ../
 
 tool golang.org/x/mobile/cmd/gobind

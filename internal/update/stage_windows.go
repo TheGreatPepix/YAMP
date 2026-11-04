@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	assetName   = "YAMD-windows.zip"
-	windowExe   = "yamd.exe"
+	assetName   = "YAMP-windows.zip"
+	windowExe   = "yamp.exe"
 	stagingName = ".update"
 )
 

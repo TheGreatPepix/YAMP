@@ -8,7 +8,7 @@ import (
 	"runtime"
 )
 
-var assetName = "YAMD-android-" + map[string]string{"arm64": "arm64", "arm": "arm", "amd64": "x86_64"}[runtime.GOARCH] + ".apk"
+var assetName = "YAMP-android-" + map[string]string{"arm64": "arm64", "arm": "arm", "amd64": "x86_64"}[runtime.GOARCH] + ".apk"
 
 func updateDir() string { return filepath.Join(os.TempDir(), "update") }
 

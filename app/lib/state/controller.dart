@@ -324,7 +324,7 @@ class Controller extends ChangeNotifier {
     if (error != null) {
       updating = false;
       updateProgress.value = null;
-      _notices.add(Notice('Не удалось обновить YAMD: $error', kind: NoticeKind.error));
+      _notices.add(Notice('Не удалось обновить YAMP: $error', kind: NoticeKind.error));
       return;
     }
     if (ev['installer'] == true) {

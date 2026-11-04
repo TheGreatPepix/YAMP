@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"ymd/internal/yam"
+	"yamp/internal/yam"
 )
 
 type searchHit struct {

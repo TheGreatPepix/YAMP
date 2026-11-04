@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-const assetName = "YAMD-macos.dmg"
+const assetName = "YAMP-macos.dmg"
 
 func bundle() (string, error) {
 	self, err := selfPath()
@@ -18,7 +18,7 @@ func bundle() (string, error) {
 	}
 	app := filepath.Dir(filepath.Dir(filepath.Dir(self)))
 	if !strings.HasSuffix(app, ".app") {
-		return "", errors.New("обновляться сам умеет только YAMD.app")
+		return "", errors.New("обновляться сам умеет только YAMP.app")
 	}
 	return app, nil
 }
@@ -37,7 +37,7 @@ func stage(a asset, progress func(done, total int64)) (plan, error) {
 	if !writable(dir) {
 		return plan{}, fmt.Errorf("нет прав на запись в папку %s", dir)
 	}
-	tmp, err := os.MkdirTemp("", "ymd-update-")
+	tmp, err := os.MkdirTemp("", "yamp-update-")
 	if err != nil {
 		return plan{}, err
 	}

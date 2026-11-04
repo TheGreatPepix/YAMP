@@ -46,7 +46,7 @@ FlutterWindow::FlutterWindow(const flutter::DartProject& project)
 FlutterWindow::~FlutterWindow() {}
 
 UINT FlutterWindow::ShowMessage() {
-  static UINT message = RegisterWindowMessageW(L"YAMD.Show");
+  static UINT message = RegisterWindowMessageW(L"YAMP.Show");
   return message;
 }
 
@@ -69,7 +69,7 @@ bool FlutterWindow::OnCreate() {
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
   channel_ = std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
-      flutter_controller_->engine()->messenger(), "yamd/desktop",
+      flutter_controller_->engine()->messenger(), "yamp/desktop",
       &flutter::StandardMethodCodec::GetInstance());
   channel_->SetMethodCallHandler([this](const auto& call, auto result) {
     HandleCall(call, std::move(result));
@@ -187,7 +187,7 @@ void FlutterWindow::AddTrayIcon() {
         GetModuleHandleW(nullptr), MAKEINTRESOURCEW(IDI_APP_ICON), IMAGE_ICON,
         GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), 0));
   }
-  wcscpy_s(tray_.szTip, L"YAMD");
+  wcscpy_s(tray_.szTip, L"YAMP");
   tray_added_ = Shell_NotifyIconW(NIM_ADD, &tray_) != FALSE;
 }
 

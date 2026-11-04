@@ -7,8 +7,8 @@ class Desktop {
   Desktop({this.args = const []});
 
   static const restartFlag = '--restart';
-  static const _channel = MethodChannel('yamd/desktop');
-  static const _android = MethodChannel('yamd/android');
+  static const _channel = MethodChannel('yamp/desktop');
+  static const _android = MethodChannel('yamp/android');
 
   Future<bool> storageGranted() async {
     if (!Platform.isAndroid) return true;
@@ -44,7 +44,7 @@ class Desktop {
     _channel.setMethodCallHandler((call) async {
       if (call.method == 'exit') exit();
     });
-    _call('tray', {'open': 'Открыть YAMD', 'exit': 'Выход'});
+    _call('tray', {'open': 'Открыть YAMP', 'exit': 'Выход'});
   }
 
   void showWindow() => _call('show');

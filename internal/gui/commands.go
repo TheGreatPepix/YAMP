@@ -6,8 +6,8 @@ import (
 	"regexp"
 	"strings"
 
-	"ymd/internal/player"
-	"ymd/internal/yam"
+	"yamp/internal/player"
+	"yamp/internal/yam"
 )
 
 type uiCommand struct {

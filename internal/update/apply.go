@@ -183,7 +183,7 @@ func copyFile(src, dst string, mode os.FileMode) error {
 }
 
 func writable(dir string) bool {
-	probe, err := os.MkdirTemp(dir, ".ymd-probe-")
+	probe, err := os.MkdirTemp(dir, ".yamp-probe-")
 	if err != nil {
 		return false
 	}
@@ -200,7 +200,7 @@ func resultPath() string {
 	if err != nil || dir == "" {
 		dir = os.TempDir()
 	}
-	return filepath.Join(dir, "ymd", "update.json")
+	return filepath.Join(dir, "yamp", "update.json")
 }
 
 func saveResult(r Result) error {

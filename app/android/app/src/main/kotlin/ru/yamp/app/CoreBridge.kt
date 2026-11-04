@@ -1,4 +1,4 @@
-package ru.yamd.app
+package ru.yamp.app
 
 import android.content.Context
 import android.os.Environment
@@ -6,8 +6,8 @@ import android.os.Handler
 import android.os.Looper
 import io.flutter.plugin.common.EventChannel
 import org.json.JSONObject
-import ru.yamd.core.mobile.Mobile
-import ru.yamd.core.mobile.Sink
+import ru.yamp.core.mobile.Mobile
+import ru.yamp.core.mobile.Sink
 import java.io.File
 
 object CoreBridge : Sink {
@@ -21,7 +21,7 @@ object CoreBridge : Sink {
     fun start(context: Context) {
         val ctx = context.applicationContext
         app = ctx
-        val music = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC), "YAMD")
+        val music = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC), "YAMP")
         Mobile.start(ctx.filesDir.path, ctx.cacheDir.path, music.path, this)
     }
 

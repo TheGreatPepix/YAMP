@@ -8,7 +8,7 @@ import (
 	"runtime"
 	"time"
 
-	"ymd/internal/yam"
+	"yamp/internal/yam"
 )
 
 const (
@@ -28,15 +28,15 @@ type deviceEvent struct {
 func deviceName() string {
 	switch runtime.GOOS {
 	case "windows":
-		return "YAMD (Windows)"
+		return "YAMP (Windows)"
 	case "darwin":
-		return "YAMD (macOS)"
+		return "YAMP (macOS)"
 	case "linux":
-		return "YAMD (Linux)"
+		return "YAMP (Linux)"
 	case "android":
-		return "YAMD (Android)"
+		return "YAMP (Android)"
 	}
-	return "YAMD"
+	return "YAMP"
 }
 
 func newDeviceID() string {

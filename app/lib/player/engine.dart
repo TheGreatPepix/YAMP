@@ -20,7 +20,7 @@ abstract class AudioEngine {
 }
 
 class MediaKitEngine implements AudioEngine {
-  MediaKitEngine() : _player = Player(configuration: const PlayerConfiguration(title: 'YAMD'));
+  MediaKitEngine() : _player = Player(configuration: const PlayerConfiguration(title: 'YAMP'));
 
   final Player _player;
 

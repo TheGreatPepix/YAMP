@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"ymd/internal/update"
+	"yamp/internal/update"
 )
 
 type selfUpdate struct {
@@ -32,11 +32,11 @@ func (g *App) onReady() {
 
 	if r != nil {
 		if r.Error != "" {
-			g.logf("Не удалось обновить YAMD до %s: %s", r.Version, r.Error)
-			g.notice("Не удалось обновить YAMD: "+r.Error, "error")
+			g.logf("Не удалось обновить YAMP до %s: %s", r.Version, r.Error)
+			g.notice("Не удалось обновить YAMP: "+r.Error, "error")
 		} else {
-			g.logf("YAMD обновлён до %s", Version)
-			g.notice("YAMD обновлён до версии "+Version, "ok")
+			g.logf("YAMP обновлён до %s", Version)
+			g.notice("YAMP обновлён до версии "+Version, "ok")
 		}
 	}
 	if first && update.ReleaseBuild(Version) {
@@ -85,7 +85,7 @@ func (g *App) applyUpdate() {
 			g.upd.mu.Lock()
 			g.upd.running = false
 			g.upd.mu.Unlock()
-			g.logf("Не удалось обновить YAMD: %v", err)
+			g.logf("Не удалось обновить YAMP: %v", err)
 			g.emit(map[string]any{"type": "updating", "error": err.Error()})
 			return
 		}
@@ -98,7 +98,7 @@ func (g *App) applyUpdate() {
 			g.emit(map[string]any{"type": "updating", "installer": true})
 			return
 		}
-		g.logf("Обновление скачано, YAMD перезапустится")
+		g.logf("Обновление скачано, YAMP перезапустится")
 		g.host.post(func() {
 			g.jobs.cancel(0)
 			g.host.exit()

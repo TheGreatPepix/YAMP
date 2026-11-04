@@ -457,7 +457,7 @@ class _Header extends StatelessWidget {
             children: [
               const BrandMark(size: 30),
               const SizedBox(width: 10),
-              Text('YAMD', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+              Text('YAMP', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
               const Spacer(),
               UpdateButton(c: c),
               DownloadsButton(c: c),
@@ -476,7 +476,7 @@ class _Header extends StatelessWidget {
             const BrandMark(size: 34),
             if (!compact) ...[
               const SizedBox(width: 10),
-              Text('YAMD', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+              Text('YAMP', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
             ],
             SizedBox(width: compact ? 12 : 20),
             ListenableBuilder(listenable: c.section, builder: (context, _) => _SectionSwitch(c: c, compact: compact)),

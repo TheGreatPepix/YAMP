@@ -32,8 +32,8 @@ class _UpdateDialog extends StatelessWidget {
             if (u.published.isNotEmpty) about += ' Версия ${u.latest} вышла ${u.published}.';
             about += u.canApply
                 ? Platform.isAndroid
-                    ? ' YAMD скачает её и откроет установщик Android.'
-                    : ' YAMD скачает её и перезапустится.'
+                    ? ' YAMP скачает её и откроет установщик Android.'
+                    : ' YAMP скачает её и перезапустится.'
                 : ' Скачайте её со страницы релиза.';
             final notes = u.notes.length > 3000 ? '${u.notes.substring(0, 3000)}…' : u.notes;
             return Padding(
@@ -72,7 +72,7 @@ class _UpdateDialog extends StatelessWidget {
                     Text(
                       Platform.isAndroid
                           ? 'Скачиваю обновление, потом откроется установщик…'
-                          : 'Скачиваю обновление, YAMD перезапустится сам…',
+                          : 'Скачиваю обновление, YAMP перезапустится сам…',
                       style: text.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
                     ),
                   ] else if (u.canApply && busy) ...[
@@ -150,7 +150,7 @@ class UpdateRow extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                c.version.isEmpty ? 'YAMD' : 'Версия ${c.version}',
+                c.version.isEmpty ? 'YAMP' : 'Версия ${c.version}',
                 style: text.labelLarge?.copyWith(fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 2),

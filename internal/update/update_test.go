@@ -56,18 +56,18 @@ func read(t *testing.T, path string) string {
 func TestMerge(t *testing.T) {
 	root := t.TempDir()
 	src, dst, backup := filepath.Join(root, "new"), filepath.Join(root, "app"), filepath.Join(root, "old")
-	write(t, filepath.Join(dst, "yamd.exe"), "old")
+	write(t, filepath.Join(dst, "yamp.exe"), "old")
 	write(t, filepath.Join(dst, "data", "a.txt"), "old")
 	write(t, filepath.Join(dst, "user.txt"), "mine")
-	write(t, filepath.Join(src, "yamd.exe"), "new")
+	write(t, filepath.Join(src, "yamp.exe"), "new")
 	write(t, filepath.Join(src, "data", "b.txt"), "new")
 	write(t, filepath.Join(src, "extra.dll"), "new")
 
 	if err := merge(src, dst, backup); err != nil {
 		t.Fatal(err)
 	}
-	if got := read(t, filepath.Join(dst, "yamd.exe")); got != "new" {
-		t.Errorf("yamd.exe = %q", got)
+	if got := read(t, filepath.Join(dst, "yamp.exe")); got != "new" {
+		t.Errorf("yamp.exe = %q", got)
 	}
 	if _, err := os.Stat(filepath.Join(dst, "data", "a.txt")); !os.IsNotExist(err) {
 		t.Errorf("old data stayed: %v", err)
@@ -78,7 +78,7 @@ func TestMerge(t *testing.T) {
 	if got := read(t, filepath.Join(dst, "user.txt")); got != "mine" {
 		t.Errorf("user.txt = %q", got)
 	}
-	if got := read(t, filepath.Join(backup, "yamd.exe")); got != "old" {
+	if got := read(t, filepath.Join(backup, "yamp.exe")); got != "old" {
 		t.Errorf("backup = %q", got)
 	}
 }
@@ -121,7 +121,7 @@ func TestMergeRollsBack(t *testing.T) {
 
 func TestSwap(t *testing.T) {
 	root := t.TempDir()
-	src, dst, backup := filepath.Join(root, ".YAMD.next"), filepath.Join(root, "YAMD"), filepath.Join(root, ".YAMD.old")
+	src, dst, backup := filepath.Join(root, ".YAMP.next"), filepath.Join(root, "YAMP"), filepath.Join(root, ".YAMP.old")
 	write(t, src, "new")
 	write(t, dst, "old")
 	if err := swap(src, dst, backup); err != nil {
@@ -139,7 +139,7 @@ func TestSwap(t *testing.T) {
 
 func TestSwapKeepsOldOnFailure(t *testing.T) {
 	root := t.TempDir()
-	dst, backup := filepath.Join(root, "YAMD"), filepath.Join(root, ".YAMD.old")
+	dst, backup := filepath.Join(root, "YAMP"), filepath.Join(root, ".YAMP.old")
 	write(t, dst, "old")
 	if err := swap(filepath.Join(root, "missing"), dst, backup); err == nil {
 		t.Fatal("swap succeeded without a source")

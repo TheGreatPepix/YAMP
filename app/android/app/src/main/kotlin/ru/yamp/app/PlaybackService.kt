@@ -1,4 +1,4 @@
-package ru.yamd.app
+package ru.yamp.app
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -60,11 +60,11 @@ class PlaybackService : Service() {
     companion object {
         private const val CHANNEL = "playback"
         private const val ID = 2
-        private const val ACTION_PLAY = "ru.yamd.app.PLAY"
-        private const val ACTION_PAUSE = "ru.yamd.app.PAUSE"
-        private const val ACTION_NEXT = "ru.yamd.app.NEXT"
-        private const val ACTION_PREVIOUS = "ru.yamd.app.PREVIOUS"
-        private const val ACTION_DISMISS = "ru.yamd.app.DISMISS"
+        private const val ACTION_PLAY = "ru.yamp.app.PLAY"
+        private const val ACTION_PAUSE = "ru.yamp.app.PAUSE"
+        private const val ACTION_NEXT = "ru.yamp.app.NEXT"
+        private const val ACTION_PREVIOUS = "ru.yamp.app.PREVIOUS"
+        private const val ACTION_DISMISS = "ru.yamp.app.DISMISS"
 
         private val main = Handler(Looper.getMainLooper())
         private var channel: MethodChannel? = null
@@ -73,7 +73,7 @@ class PlaybackService : Service() {
 
         fun attach(context: Context, messenger: BinaryMessenger) {
             val app = context.applicationContext
-            channel = MethodChannel(messenger, "yamd/media").apply {
+            channel = MethodChannel(messenger, "yamp/media").apply {
                 setMethodCallHandler { call, result ->
                     when (call.method) {
                         "update" -> {
@@ -157,7 +157,7 @@ class PlaybackService : Service() {
         super.onCreate()
         instance = this
         audio = getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        session = MediaSession(this, "YAMD").apply {
+        session = MediaSession(this, "YAMP").apply {
             @Suppress("DEPRECATION")
             setFlags(MediaSession.FLAG_HANDLES_MEDIA_BUTTONS or MediaSession.FLAG_HANDLES_TRANSPORT_CONTROLS)
             setCallback(object : MediaSession.Callback() {
@@ -382,7 +382,7 @@ class PlaybackService : Service() {
 
     private fun placeholder(): Notification = builder()
         .setSmallIcon(android.R.drawable.ic_media_play)
-        .setContentTitle("YAMD")
+        .setContentTitle("YAMP")
         .build()
 
     private fun notification(t: Track): Notification {

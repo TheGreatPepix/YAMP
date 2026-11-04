@@ -1,4 +1,4 @@
-package ru.yamd.app
+package ru.yamp.app
 
 import android.content.ContentProvider
 import android.content.ContentValues
@@ -14,7 +14,7 @@ import java.io.FileNotFoundException
 
 class ApkProvider : ContentProvider() {
     companion object {
-        private const val AUTHORITY = "ru.yamd.app.apk"
+        private const val AUTHORITY = "ru.yamp.app.apk"
         private const val MIME = "application/vnd.android.package-archive"
 
         fun install(context: Context, path: String) {

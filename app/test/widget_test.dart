@@ -2,16 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:ymd/app.dart';
-import 'package:ymd/core/core.dart';
-import 'package:ymd/core/fake_core.dart';
-import 'package:ymd/state/controller.dart';
-import 'package:ymd/state/models.dart';
-import 'package:ymd/state/search.dart';
+import 'package:yamp/app.dart';
+import 'package:yamp/core/core.dart';
+import 'package:yamp/core/fake_core.dart';
+import 'package:yamp/state/controller.dart';
+import 'package:yamp/state/models.dart';
+import 'package:yamp/state/search.dart';
 
 Future<(FakeCore, Controller)> _open(
   WidgetTester tester, {
-  String latest = '2.2.0',
+  String latest = '0.1.0',
   Duration tick = const Duration(milliseconds: 120),
 }) async {
   tester.view.physicalSize = const Size(1280, 860);
@@ -82,7 +82,7 @@ void main() {
     final (core, c) = await _open(tester);
 
     expect(c.ready, isTrue);
-    expect(c.version, '2.2.0');
+    expect(c.version, '0.1.0');
     expect(find.text('Войти через Яндекс'), findsOneWidget);
     expect(find.text('Что скачаем?'), findsNothing);
 
@@ -340,7 +340,7 @@ void main() {
 
     await tester.tap(find.byTooltip('Настройки'));
     await tester.pumpAndSettle();
-    expect(find.text('Версия 2.2.0'), findsOneWidget);
+    expect(find.text('Версия 0.1.0'), findsOneWidget);
 
     await tester.tap(find.text('Проверить'));
     await tester.pump();

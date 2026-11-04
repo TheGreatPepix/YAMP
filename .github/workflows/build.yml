@@ -50,22 +50,22 @@ jobs:
           flutter build windows --release
           cp ../dist-core/ymcore.exe build/windows/x64/runner/Release/
           mkdir -p ../dist
-          cp -r build/windows/x64/runner/Release ../dist/YAMD
+          cp -r build/windows/x64/runner/Release ../dist/YAMP
 
       - name: Zip
         working-directory: dist
-        run: 7z a -tzip YAMD-windows.zip YAMD > /dev/null
+        run: 7z a -tzip YAMP-windows.zip YAMP > /dev/null
 
       - uses: actions/upload-artifact@v4
         with:
-          name: YAMD-windows
-          path: dist/YAMD
+          name: YAMP-windows
+          path: dist/YAMP
 
       - name: Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/YAMD-windows.zip
+          files: dist/YAMP-windows.zip
 
   linux:
     runs-on: ubuntu-22.04
@@ -105,31 +105,31 @@ jobs:
           mkdir -p "$appdir/usr/bin"
           cp -r "$bundle/." "$appdir/usr/bin/"
           cp dist-core/ymcore "$appdir/usr/bin/"
-          cp app/linux/packaging/yamd.png "$appdir/usr/bin/data/yamd.png"
-          cp app/linux/packaging/yamd.desktop "$appdir/yamd.desktop"
-          cp app/linux/packaging/yamd.png "$appdir/yamd.png"
-          cp app/linux/packaging/yamd.png "$appdir/.DirIcon"
+          cp app/linux/packaging/yamp.png "$appdir/usr/bin/data/yamp.png"
+          cp app/linux/packaging/yamp.desktop "$appdir/yamp.desktop"
+          cp app/linux/packaging/yamp.png "$appdir/yamp.png"
+          cp app/linux/packaging/yamp.png "$appdir/.DirIcon"
           cat > "$appdir/AppRun" <<'EOF'
           #!/bin/sh
           here="$(dirname "$(readlink -f "$0")")"
-          exec "$here/usr/bin/yamd" "$@"
+          exec "$here/usr/bin/yamp" "$@"
           EOF
           sed -i 's/^ *//' "$appdir/AppRun"
-          chmod +x "$appdir/AppRun" "$appdir/usr/bin/yamd" "$appdir/usr/bin/ymcore"
+          chmod +x "$appdir/AppRun" "$appdir/usr/bin/yamp" "$appdir/usr/bin/ymcore"
           wget -q -O appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
           chmod +x appimagetool
-          ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 ./appimagetool "$appdir" dist/YAMD-linux-x86_64.AppImage
+          ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 ./appimagetool "$appdir" dist/YAMP-linux-x86_64.AppImage
 
       - uses: actions/upload-artifact@v4
         with:
-          name: YAMD-linux
-          path: dist/YAMD-linux-x86_64.AppImage
+          name: YAMP-linux
+          path: dist/YAMP-linux-x86_64.AppImage
 
       - name: Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/YAMD-linux-x86_64.AppImage
+          files: dist/YAMP-linux-x86_64.AppImage
 
   macos:
     runs-on: macos-14
@@ -161,25 +161,25 @@ jobs:
 
       - name: DMG
         run: |
-          app=app/build/macos/Build/Products/Release/YAMD.app
+          app=app/build/macos/Build/Products/Release/YAMP.app
           cp dist-core/ymcore "$app/Contents/MacOS/ymcore"
           codesign --force --sign - "$app/Contents/MacOS/ymcore"
           codesign --force --deep --sign - "$app"
           mkdir -p dist/dmg
           cp -R "$app" dist/dmg/
           ln -s /Applications dist/dmg/Applications
-          hdiutil create -volname YAMD -srcfolder dist/dmg -ov -format UDZO dist/YAMD-macos.dmg
+          hdiutil create -volname YAMP -srcfolder dist/dmg -ov -format UDZO dist/YAMP-macos.dmg
 
       - uses: actions/upload-artifact@v4
         with:
-          name: YAMD-macos
-          path: dist/YAMD-macos.dmg
+          name: YAMP-macos
+          path: dist/YAMP-macos.dmg
 
       - name: Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/YAMD-macos.dmg
+          files: dist/YAMP-macos.dmg
 
   android:
     runs-on: ubuntu-latest
@@ -209,7 +209,7 @@ jobs:
           go install golang.org/x/mobile/cmd/gomobile@$(go list -m -f '{{.Version}}' golang.org/x/mobile)
           gomobile init
           mkdir -p ../app/android/app/libs
-          gomobile bind -target=android/arm64,android/arm,android/amd64 -androidapi 24 -javapkg ru.yamd.core \
+          gomobile bind -target=android/arm64,android/arm,android/amd64 -androidapi 24 -javapkg ru.yamp.core \
             -trimpath -ldflags "-s -w" -o ../app/android/app/libs/ymcore.aar .
 
       - name: Signing
@@ -221,9 +221,9 @@ jobs:
             echo "::warning::нет ANDROID_KEYSTORE, APK подписан отладочным ключом"
             exit 0
           fi
-          echo "$KEYSTORE" | base64 -d > "$RUNNER_TEMP/yamd-release.jks"
-          printf 'storeFile=%s\nstorePassword=%s\nkeyPassword=%s\nkeyAlias=yamd\n' \
-            "$RUNNER_TEMP/yamd-release.jks" "$PASSWORD" "$PASSWORD" > app/android/key.properties
+          echo "$KEYSTORE" | base64 -d > "$RUNNER_TEMP/yamp-release.jks"
+          printf 'storeFile=%s\nstorePassword=%s\nkeyPassword=%s\nkeyAlias=yamp\n' \
+            "$RUNNER_TEMP/yamp-release.jks" "$PASSWORD" "$PASSWORD" > app/android/key.properties
 
       - name: Build
         working-directory: app
@@ -232,13 +232,13 @@ jobs:
           flutter build apk --release --split-per-abi
           mkdir -p ../dist
           out=build/app/outputs/flutter-apk
-          cp "$out/app-arm64-v8a-release.apk" ../dist/YAMD-android-arm64.apk
-          cp "$out/app-armeabi-v7a-release.apk" ../dist/YAMD-android-arm.apk
-          cp "$out/app-x86_64-release.apk" ../dist/YAMD-android-x86_64.apk
+          cp "$out/app-arm64-v8a-release.apk" ../dist/YAMP-android-arm64.apk
+          cp "$out/app-armeabi-v7a-release.apk" ../dist/YAMP-android-arm.apk
+          cp "$out/app-x86_64-release.apk" ../dist/YAMP-android-x86_64.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: YAMD-android
+          name: YAMP-android
           path: dist/*.apk
 
       - name: Release

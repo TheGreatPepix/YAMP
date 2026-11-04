@@ -7,10 +7,10 @@ import (
 	"sync"
 	"time"
 
-	"ymd/internal/yam"
+	"yamp/internal/yam"
 )
 
-const Version = "2.2.0"
+const Version = "0.1.0"
 
 const (
 	accNone     = "none"
@@ -248,7 +248,7 @@ func (g *App) startDownload(link, dir string, sel yam.Selection) {
 		return
 	}
 	if g.updating() {
-		g.notice("Идёт обновление YAMD", "error")
+		g.notice("Идёт обновление YAMP", "error")
 		return
 	}
 	if _, err := yam.ParseLink(link); err != nil {

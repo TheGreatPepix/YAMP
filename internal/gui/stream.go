@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"ymd/internal/yam"
+	"yamp/internal/yam"
 )
 
 type streamServer struct {

@@ -36,7 +36,7 @@ func (b *dataBlob) bytes() []byte {
 	return append([]byte(nil), unsafe.Slice(b.pbData, b.cbData)...)
 }
 
-var entropy = []byte("ymd/oauth-token/v1")
+var entropy = []byte("yamp/oauth-token/v1")
 
 func protect(plain []byte) ([]byte, error) {
 	var out dataBlob

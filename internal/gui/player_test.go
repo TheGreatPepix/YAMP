@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"ymd/internal/yam"
+	"yamp/internal/yam"
 )
 
 type fakeMusic struct {

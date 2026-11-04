@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.thegreatpepix" "\0"
-            VALUE "FileDescription", "YAMD, Yet Another Music Downloader" "\0"
+            VALUE "FileDescription", "YAMP, Yet Another Music Player" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "yamd" "\0"
+            VALUE "InternalName", "yamp" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 com.thegreatpepix. All rights reserved." "\0"
-            VALUE "OriginalFilename", "yamd.exe" "\0"
-            VALUE "ProductName", "YAMD" "\0"
+            VALUE "OriginalFilename", "yamp.exe" "\0"
+            VALUE "ProductName", "YAMP" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

@@ -9,15 +9,15 @@ import (
 	"sync"
 	"time"
 
-	"ymd/internal/player"
-	"ymd/internal/yam"
+	"yamp/internal/player"
+	"yamp/internal/yam"
 )
 
 const (
 	sourceWave  = "wave"
 	sourceLiked = "liked"
 
-	playFrom      = "desktop_win-yamd-player-default"
+	playFrom      = "desktop_win-yamp-player-default"
 	restartAfter  = 3.0
 	maxFailures   = 3
 	waveLow       = 2

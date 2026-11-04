@@ -17,7 +17,7 @@ import (
 var APIBase = "https://api.music.yandex.net"
 
 const (
-	userAgent    = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) YAMD/2.0"
+	userAgent    = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) YAMP/2.0"
 	clientHeader = "YandexMusicAndroid/24023621"
 )
 

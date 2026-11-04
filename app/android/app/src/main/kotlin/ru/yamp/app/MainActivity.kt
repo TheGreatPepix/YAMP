@@ -1,4 +1,4 @@
-package ru.yamd.app
+package ru.yamp.app
 
 import android.Manifest
 import android.content.ActivityNotFoundException
@@ -39,7 +39,7 @@ class MainActivity : FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
         CoreBridge.start(this)
         val messenger = flutterEngine.dartExecutor.binaryMessenger
-        MethodChannel(messenger, "yamd/core").setMethodCallHandler { call, result ->
+        MethodChannel(messenger, "yamp/core").setMethodCallHandler { call, result ->
             when (call.method) {
                 "send" -> {
                     CoreBridge.send(call.arguments as String)
@@ -49,11 +49,11 @@ class MainActivity : FlutterActivity() {
             }
         }
         PlaybackService.attach(this, messenger)
-        EventChannel(messenger, "yamd/core/events").setStreamHandler(object : EventChannel.StreamHandler {
+        EventChannel(messenger, "yamp/core/events").setStreamHandler(object : EventChannel.StreamHandler {
             override fun onListen(arguments: Any?, events: EventChannel.EventSink?) = CoreBridge.attach(events)
             override fun onCancel(arguments: Any?) = CoreBridge.attach(null)
         })
-        MethodChannel(messenger, "yamd/android").setMethodCallHandler { call, result ->
+        MethodChannel(messenger, "yamp/android").setMethodCallHandler { call, result ->
             when (call.method) {
                 "open" -> result.success(open(call.arguments as String))
                 "openFolder" -> result.success(openFolder(call.arguments as String))

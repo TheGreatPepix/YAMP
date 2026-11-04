@@ -1,4 +1,4 @@
-package ru.yamd.app
+package ru.yamp.app
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -75,7 +75,7 @@ class DownloadService : Service() {
             }
             return builder
                 .setSmallIcon(android.R.drawable.stat_sys_download)
-                .setContentTitle("YAMD качает музыку")
+                .setContentTitle("YAMP качает музыку")
                 .setContentText(text)
                 .setContentIntent(open)
                 .setOngoing(true)

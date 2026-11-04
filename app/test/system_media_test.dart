@@ -1,9 +1,9 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:ymd/player/engine.dart';
-import 'package:ymd/player/system_media.dart';
-import 'package:ymd/state/player.dart';
+import 'package:yamp/player/engine.dart';
+import 'package:yamp/player/system_media.dart';
+import 'package:yamp/state/player.dart';
 
 const _channel = MethodChannel('test/media');
 

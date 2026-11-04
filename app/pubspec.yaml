@@ -1,7 +1,7 @@
-name: ymd
-description: "YAMD, Yet Another Music Downloader: окно на Flutter поверх ядра ymcore."
+name: yamp
+description: "YAMP, Yet Another Music Player: окно на Flutter поверх ядра ymcore."
 publish_to: 'none'
-version: 2.2.0+10
+version: 0.1.0+1
 
 environment:
   sdk: ^3.8.0

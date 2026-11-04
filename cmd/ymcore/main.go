@@ -6,8 +6,8 @@ import (
 	"log"
 	"os"
 
-	"ymd/internal/gui"
-	"ymd/internal/update"
+	"yamp/internal/gui"
+	"yamp/internal/update"
 )
 
 const maxCommand = 16 << 20

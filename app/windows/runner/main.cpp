@@ -8,7 +8,7 @@
 
 namespace {
 
-constexpr wchar_t kMutexName[] = L"Local\\YAMD.SingleInstance";
+constexpr wchar_t kMutexName[] = L"Local\\YAMP.SingleInstance";
 
 bool HasFlag(const wchar_t* flag) {
   int count = 0;
@@ -39,15 +39,15 @@ bool TakeLock(bool wait, HANDLE* lock) {
 }
 
 void ShowRunning() {
-  HWND running = FindWindowW(L"YAMDWindow", nullptr);
+  HWND running = FindWindowW(L"YAMPWindow", nullptr);
   if (running) {
     AllowSetForegroundWindow(ASFW_ANY);
     PostMessageW(running, FlutterWindow::ShowMessage(), 0, 0);
     return;
   }
   MessageBoxW(nullptr,
-              L"YAMD \x0443\x0436\x0435 \x0437\x0430\x043F\x0443\x0449\x0435\x043D.",
-              L"YAMD", MB_OK | MB_ICONINFORMATION);
+              L"YAMP \x0443\x0436\x0435 \x0437\x0430\x043F\x0443\x0449\x0435\x043D.",
+              L"YAMP", MB_OK | MB_ICONINFORMATION);
 }
 
 }  // namespace
@@ -80,7 +80,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   FlutterWindow window(project);
   Win32Window::Point origin(10, 10);
   Win32Window::Size size(1240, 820);
-  if (!window.Create(L"YAMD", origin, size)) {
+  if (!window.Create(L"YAMP", origin, size)) {
     return EXIT_FAILURE;
   }
   window.SetQuitOnClose(true);

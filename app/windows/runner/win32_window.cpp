@@ -16,7 +16,7 @@ namespace {
 #define DWMWA_USE_IMMERSIVE_DARK_MODE 20
 #endif
 
-constexpr const wchar_t kWindowClassName[] = L"YAMDWindow";
+constexpr const wchar_t kWindowClassName[] = L"YAMPWindow";
 
 /// Registry key for app theme preference.
 ///

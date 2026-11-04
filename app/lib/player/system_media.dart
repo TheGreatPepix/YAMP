@@ -6,7 +6,7 @@ import 'package:flutter/services.dart';
 import '../state/player.dart';
 
 class SystemMedia {
-  SystemMedia(this.player, {MethodChannel channel = const MethodChannel('yamd/media'), DateTime Function()? clock})
+  SystemMedia(this.player, {MethodChannel channel = const MethodChannel('yamp/media'), DateTime Function()? clock})
     : _channel = channel,
       _clock = clock ?? DateTime.now {
     _channel.setMethodCallHandler(_command);

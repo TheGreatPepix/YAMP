@@ -399,7 +399,7 @@ func TestOAuthDeviceFlow(t *testing.T) {
 		}
 		switch r.URL.Path {
 		case "/device/code":
-			if r.Form.Get("device_id") != "dev-123456" || r.Form.Get("device_name") != "YAMD (тест)" {
+			if r.Form.Get("device_id") != "dev-123456" || r.Form.Get("device_name") != "YAMP (тест)" {
 				t.Errorf("device/code: %v", r.Form)
 			}
 			w.Write([]byte(`{"device_code":"dc","user_code":"abcd1234","verification_url":"https://ya.ru/device","interval":1,"expires_in":300}`))
@@ -440,7 +440,7 @@ func TestOAuthDeviceFlow(t *testing.T) {
 	o := &OAuth{base: srv.URL, http: srv.Client()}
 	ctx := context.Background()
 
-	code, err := o.DeviceCode(ctx, "dev-123456", "YAMD (тест)")
+	code, err := o.DeviceCode(ctx, "dev-123456", "YAMP (тест)")
 	if err != nil || code.UserCode != "abcd1234" || code.Interval != 1 || code.ExpiresIn != 300 {
 		t.Fatalf("DeviceCode = %+v, %v", code, err)
 	}

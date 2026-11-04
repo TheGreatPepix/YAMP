@@ -1,9 +1,9 @@
-<h1 align="center">YAMD · Yet Another Music Downloader</h1>
+<h1 align="center">YAMP · Yet Another Music Player</h1>
 
 <p align="center">
-  <a href="../../releases/latest"><img alt="версия" src="https://img.shields.io/github/v/release/TheGreatPepix/YAMD?style=for-the-badge&labelColor=1A1600&label=%D0%B2%D0%B5%D1%80%D1%81%D0%B8%D1%8F&color=FFD43B"></a>
-  <a href="../../releases"><img alt="скачиваний" src="https://img.shields.io/github/downloads/TheGreatPepix/YAMD/total?style=for-the-badge&labelColor=1A1600&label=%D1%81%D0%BA%D0%B0%D1%87%D0%B8%D0%B2%D0%B0%D0%BD%D0%B8%D0%B9&color=FF9E1B"></a>
-  <a href="../../actions/workflows/build.yml"><img alt="сборка" src="https://img.shields.io/github/actions/workflow/status/TheGreatPepix/YAMD/build.yml?style=for-the-badge&labelColor=1A1600&label=%D1%81%D0%B1%D0%BE%D1%80%D0%BA%D0%B0&color=3DDC84"></a>
+  <a href="../../releases/latest"><img alt="версия" src="https://img.shields.io/github/v/release/TheGreatPepix/YAMP?style=for-the-badge&labelColor=1A1600&label=%D0%B2%D0%B5%D1%80%D1%81%D0%B8%D1%8F&color=FFD43B"></a>
+  <a href="../../releases"><img alt="скачиваний" src="https://img.shields.io/github/downloads/TheGreatPepix/YAMP/total?style=for-the-badge&labelColor=1A1600&label=%D1%81%D0%BA%D0%B0%D1%87%D0%B8%D0%B2%D0%B0%D0%BD%D0%B8%D0%B9&color=FF9E1B"></a>
+  <a href="../../actions/workflows/build.yml"><img alt="сборка" src="https://img.shields.io/github/actions/workflow/status/TheGreatPepix/YAMP/build.yml?style=for-the-badge&labelColor=1A1600&label=%D1%81%D0%B1%D0%BE%D1%80%D0%BA%D0%B0&color=3DDC84"></a>
   <a href="LICENSE"><img alt="лицензия" src="https://img.shields.io/badge/%D0%BB%D0%B8%D1%86%D0%B5%D0%BD%D0%B7%D0%B8%D1%8F-GPL--3.0-2A2A33?style=for-the-badge&labelColor=1A1600"></a>
 </p>
 
@@ -29,10 +29,10 @@
 
 > Для подписчиков **Яндекс Плюс**.
 
-## Почему YAMD
+## Почему YAMP
 
 **Поиск прямо в приложении.** Начните вводить название песни, альбома или имя
-исполнителя, и результаты появятся сразу. Опечатки не страшны: YAMD подскажет,
+исполнителя, и результаты появятся сразу. Опечатки не страшны: YAMP подскажет,
 что вы имели в виду.
 
 **Или просто вставьте ссылку.** Трек, альбом, плейлист, исполнитель, хоть
@@ -43,7 +43,7 @@
 альбомы у исполнителя.
 
 **Звук как в студии.** Настоящий lossless, а не пережатая копия. Если у трека
-нет версии без потерь, YAMD возьмёт лучшее из доступного.
+нет версии без потерь, YAMP возьмёт лучшее из доступного.
 
 **Красивая медиатека без усилий.** Обложки, названия, номера треков и год
 появляются в файлах сами, а альбомы раскладываются по папкам. Любой плеер
@@ -53,12 +53,12 @@
 приложение и заниматься своими делами: на телефоне прогресс виден в
 уведомлении, а на компьютере загрузки продолжаются, даже когда окно свёрнуто.
 
-**Ничего не теряется.** Пропал интернет? YAMD сам попробует снова. Уже
+**Ничего не теряется.** Пропал интернет? YAMP сам попробует снова. Уже
 скачанное повторно не качается.
 
 **Приятно пользоваться.** Современный интерфейс, тёмная и светлая темы.
 
-**Всегда свежая версия.** YAMD сам замечает обновления и ставит их в пару
+**Всегда свежая версия.** YAMP сам замечает обновления и ставит их в пару
 нажатий.
 
 ## Вход за минуту
@@ -69,7 +69,7 @@
 
 ## Ваши данные остаются вашими
 
-Доступ к аккаунту хранится только на вашем устройстве и нигде больше. YAMD
+Доступ к аккаунту хранится только на вашем устройстве и нигде больше. YAMP
 общается напрямую с Яндексом, без посредников и сбора статистики. При выходе
 из аккаунта доступ закрывается и на стороне Яндекса. Код программы открыт:
 каждый может проверить, что она делает.
@@ -80,13 +80,13 @@
 
 | Где | Что скачать |
 |---|---|
-| Android | `YAMD-android-arm64.apk` |
-| Windows | `YAMD-windows.zip` |
-| macOS | `YAMD-macos.dmg` |
-| Linux | `YAMD-linux-x86_64.AppImage` |
+| Android | `YAMP-android-arm64.apk` |
+| Windows | `YAMP-windows.zip` |
+| macOS | `YAMP-macos.dmg` |
+| Linux | `YAMP-linux-x86_64.AppImage` |
 
 На Android откройте файл и разрешите установку. Для старых 32-битных телефонов
-есть `YAMD-android-arm.apk`.
+есть `YAMP-android-arm.apk`.
 
 На macOS при первом запуске система может заблокировать приложение. Откройте
 «Системные настройки», раздел «Конфиденциальность и безопасность», и нажмите
@@ -104,9 +104,9 @@ sudo pacman -S mpv            # Arch
 
 ## Важно
 
-Код YAMD открыт по лицензии [GPL-3.0](LICENSE), © 2026 TheGreatPepix.
+Код YAMP открыт по лицензии [GPL-3.0](LICENSE), © 2026 TheGreatPepix.
 
-YAMD неофициальный проект и не связан с компанией «Яндекс». «Яндекс», «Яндекс
+YAMP неофициальный проект и не связан с компанией «Яндекс». «Яндекс», «Яндекс
 Музыка» и «Яндекс Плюс» являются товарными знаками их правообладателей.
 
 Программа предназначена только для личного использования музыки, к которой у
@@ -114,5 +114,5 @@ YAMD неофициальный проект и не связан с компа�
 нарушать авторские права. За использование программы и скачанных материалов
 отвечаете вы сами.
 
-YAMD предоставляется «как есть», без гарантий. Если Яндекс что-то изменит у
+YAMP предоставляется «как есть», без гарантий. Если Яндекс что-то изменит у
 себя, часть функций может временно перестать работать.

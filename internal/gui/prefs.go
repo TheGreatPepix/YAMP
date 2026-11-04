@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"ymd/internal/player"
-	"ymd/internal/yam"
+	"yamp/internal/player"
+	"yamp/internal/yam"
 )
 
 const (
@@ -61,7 +61,7 @@ func configPath() string {
 	if err != nil || dir == "" {
 		dir = os.TempDir()
 	}
-	return filepath.Join(dir, "ymd", "config.json")
+	return filepath.Join(dir, "yamp", "config.json")
 }
 
 func loadConfig() config {

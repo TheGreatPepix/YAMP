@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"sync"
 
-	"ymd/internal/gui"
+	"yamp/internal/gui"
 )
 
 type Sink interface {

@@ -38,7 +38,7 @@ AudioEngine _engine() {
     return UnavailableEngine(
       Platform.isLinux
           ? 'Для воспроизведения нужна библиотека libmpv. Установите пакет libmpv2 или libmpv1 '
-                '(Debian, Ubuntu), mpv-libs (Fedora) или mpv (Arch) и перезапустите YAMD'
+                '(Debian, Ubuntu), mpv-libs (Fedora) или mpv (Arch) и перезапустите YAMP'
           : 'Плеер не запустился: $e',
     );
   }

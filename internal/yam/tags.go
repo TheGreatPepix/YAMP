@@ -173,7 +173,7 @@ func vorbisComment(t Tags) []byte {
 		add("ITUNESADVISORY", "1")
 	}
 
-	const vendor = "YAMD"
+	const vendor = "YAMP"
 	var b bytes.Buffer
 	_ = binary.Write(&b, binary.LittleEndian, uint32(len(vendor)))
 	b.WriteString(vendor)

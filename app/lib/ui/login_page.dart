@@ -69,12 +69,12 @@ class _LoginPageState extends State<LoginPage> {
                   const Center(child: BrandMark(size: 64)),
                   const SizedBox(height: 20),
                   Text(
-                    'YAMD',
+                    'YAMP',
                     textAlign: TextAlign.center,
                     style: text.headlineSmall,
                   ),
                   Text(
-                    'Yet Another Music Downloader',
+                    'Yet Another Music Player',
                     textAlign: TextAlign.center,
                     style: text.labelLarge?.copyWith(color: context.status.accent, letterSpacing: 0.4),
                   ),

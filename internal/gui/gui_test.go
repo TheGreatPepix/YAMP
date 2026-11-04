@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"ymd/internal/yam"
+	"yamp/internal/yam"
 )
 
 func TestGateLimit(t *testing.T) {

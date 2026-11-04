@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	repo         = "TheGreatPepix/YMD"
+	repo         = "TheGreatPepix/YAMP"
 	releasesPage = "https://github.com/" + repo + "/releases"
 )
 
@@ -57,7 +57,7 @@ func latestRelease(current string) (release, error) {
 		return release{}, err
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("User-Agent", "YAMD/"+current)
+	req.Header.Set("User-Agent", "YAMP/"+current)
 	resp, err := apiClient.Do(req)
 	if err != nil {
 		return release{}, fmt.Errorf("нет связи с GitHub: %w", err)
@@ -205,7 +205,7 @@ func Install(current string, windowPID int, progress func(done, total int64)) (s
 		return "", err
 	}
 	if !newer(r.Tag, current) {
-		return "", fmt.Errorf("YAMD %s уже последней версии", current)
+		return "", fmt.Errorf("YAMP %s уже последней версии", current)
 	}
 	a, ok := r.asset(assetName)
 	if !ok {

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=YAMP
+GenericName=Music Downloader
+Comment=Yet Another Music Player: музыка из Яндекс Музыки в FLAC и MP3
+Exec=yamp
+Icon=yamp
+Categories=AudioVideo;Audio;Network;
+Terminal=false
+StartupWMClass=yamp

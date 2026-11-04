@@ -51,7 +51,7 @@ class _YmdAppState extends State<YmdApp> {
     _askingExit = true;
     final ok = await confirm(
       ctx,
-      title: 'Выйти из YAMD?',
+      title: 'Выйти из YAMP?',
       body: 'Незавершённые загрузки: ${c.running}. Они остановятся, готовые треки останутся.',
       action: 'Выйти',
     );
@@ -120,7 +120,7 @@ class _YmdAppState extends State<YmdApp> {
       listenable: c,
       builder: (context, _) {
         return MaterialApp(
-          title: 'YAMD',
+          title: 'YAMP',
           debugShowCheckedModeBanner: false,
           scaffoldMessengerKey: _messenger,
           navigatorKey: _navigator,
@@ -189,7 +189,7 @@ class _Splash extends StatelessWidget {
   }
 }
 
-const releasesUrl = 'https://github.com/TheGreatPepix/YMD/releases/latest';
+const releasesUrl = 'https://github.com/TheGreatPepix/YAMP/releases/latest';
 
 class _Fatal extends StatelessWidget {
   const _Fatal({super.key, required this.c});
@@ -214,7 +214,7 @@ class _Fatal extends StatelessWidget {
                 Text(c.fatal ?? '', textAlign: TextAlign.center, style: text.titleMedium),
                 const SizedBox(height: 8),
                 Text(
-                  'Перезапустите YAMD. Если ошибка повторится, скачайте программу заново со страницы '
+                  'Перезапустите YAMP. Если ошибка повторится, скачайте программу заново со страницы '
                   'релизов: настройки и вход сохранятся.',
                   textAlign: TextAlign.center,
                   style: text.bodyMedium?.copyWith(color: scheme.onSurfaceVariant, height: 1.45),

@@ -7,10 +7,10 @@ import 'core.dart';
 
 class AndroidCore implements Core {
   AndroidCore() {
-    _sub = const EventChannel('yamd/core/events').receiveBroadcastStream().listen(_event);
+    _sub = const EventChannel('yamp/core/events').receiveBroadcastStream().listen(_event);
   }
 
-  static const _method = MethodChannel('yamd/core');
+  static const _method = MethodChannel('yamp/core');
 
   final _events = StreamController<Event>();
   late final StreamSubscription<dynamic> _sub;
