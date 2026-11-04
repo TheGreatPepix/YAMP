@@ -401,7 +401,7 @@ class HitRow extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         canRequestFocus: false,
-        onTap: () => c.toggleHit(hit),
+        onTap: () => c.openHit(hit),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
           child: Row(
@@ -438,6 +438,20 @@ class HitRow extends StatelessWidget {
                 ),
               ],
               const SizedBox(width: 12),
+              if (hit.kind == ReleaseKind.track) ...[
+                IconButton(
+                  tooltip: 'Слушать',
+                  onPressed: () => c.player.play(hit.link),
+                  style: IconButton.styleFrom(
+                    fixedSize: const Size.square(30),
+                    minimumSize: const Size.square(30),
+                    padding: EdgeInsets.zero,
+                  ),
+                  iconSize: 20,
+                  icon: const Icon(Icons.play_arrow_rounded),
+                ),
+                const SizedBox(width: 8),
+              ],
               _AddButton(added: added, onPressed: () => c.toggleHit(hit), size: 30),
             ],
           ),
@@ -499,7 +513,7 @@ class HitCard extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         canRequestFocus: false,
-        onTap: () => c.toggleHit(hit),
+        onTap: () => c.openHit(hit),
         child: Padding(
           padding: const EdgeInsets.all(8),
           child: Column(
@@ -567,7 +581,7 @@ class BestCard extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         canRequestFocus: false,
-        onTap: () => c.toggleHit(hit),
+        onTap: () => c.openHit(hit),
         child: Padding(
           padding: EdgeInsets.all(isPhone(context) ? 14 : 18),
           child: Row(

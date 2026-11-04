@@ -7,6 +7,7 @@ import 'state/controller.dart';
 import 'state/models.dart';
 import 'theme.dart';
 import 'ui/login_page.dart';
+import 'ui/player/keys.dart';
 import 'ui/main_page.dart';
 import 'ui/update_dialog.dart';
 import 'ui/widgets.dart';
@@ -125,6 +126,11 @@ class _YmdAppState extends State<YmdApp> {
           navigatorKey: _navigator,
           theme: buildTheme(Brightness.light),
           darkTheme: buildTheme(Brightness.dark),
+          builder: (context, child) => PlayerKeys(
+            p: c.player,
+            enabled: () => c.canDownload && !(_navigator.currentState?.canPop() ?? false),
+            child: child ?? const SizedBox.shrink(),
+          ),
           themeMode: switch (c.theme) {
             ThemeChoice.light => ThemeMode.light,
             ThemeChoice.dark => ThemeMode.dark,

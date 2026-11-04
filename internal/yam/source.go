@@ -24,6 +24,8 @@ const (
 	Lossless Quality = "lossless"
 
 	MP3 Quality = "mp3"
+
+	Low Quality = "low"
 )
 
 const (
@@ -92,7 +94,7 @@ func (c *Client) losslessSource(ctx context.Context, trackID string) (source, er
 	return source{URL: link, Codec: strings.ToLower(d.Codec), Bitrate: d.Bitrate, Key: d.Key}, nil
 }
 
-func (c *Client) mp3Source(ctx context.Context, trackID string) (source, error) {
+func (c *Client) mp3Source(ctx context.Context, trackID string, low bool) (source, error) {
 	var infos []struct {
 		Codec           string `json:"codec"`
 		BitrateInKbps   int    `json:"bitrateInKbps"`
@@ -112,7 +114,11 @@ func (c *Client) mp3Source(ctx context.Context, trackID string) (source, error) 
 		}
 		b := infos[best]
 		isMP3, bestMP3 := it.Codec == "mp3", b.Codec == "mp3"
-		if (isMP3 && !bestMP3) || (isMP3 == bestMP3 && it.BitrateInKbps > b.BitrateInKbps) {
+		better := it.BitrateInKbps > b.BitrateInKbps
+		if low {
+			better = it.BitrateInKbps < b.BitrateInKbps
+		}
+		if (isMP3 && !bestMP3) || (isMP3 == bestMP3 && better) {
 			best = i
 		}
 	}
@@ -163,5 +169,5 @@ func (c *Client) audioSource(ctx context.Context, trackID string, q Quality) (so
 			return source{}, err
 		}
 	}
-	return c.mp3Source(ctx, trackID)
+	return c.mp3Source(ctx, trackID, q == Low)
 }

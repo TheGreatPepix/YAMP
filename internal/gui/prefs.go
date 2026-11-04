@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"ymd/internal/player"
 	"ymd/internal/yam"
 )
 
@@ -21,6 +22,11 @@ type config struct {
 	Theme       string `json:"theme"`
 	Quality     string `json:"quality"`
 	Concurrency int    `json:"concurrency"`
+
+	PlayQuality string   `json:"playQuality,omitempty"`
+	Volume      *float64 `json:"volume,omitempty"`
+	Repeat      string   `json:"repeat,omitempty"`
+	Shuffle     bool     `json:"shuffle,omitempty"`
 
 	Token    string `json:"token,omitempty"`
 	Refresh  string `json:"refresh,omitempty"`
@@ -76,6 +82,13 @@ func loadConfig() config {
 				c.Concurrency = clampConcurrency(saved.Concurrency)
 			}
 			c.Token, c.Refresh, c.Expires, c.DeviceID = saved.Token, saved.Refresh, saved.Expires, saved.DeviceID
+			c.PlayQuality = string(playQuality(saved.PlayQuality))
+			if saved.Volume != nil {
+				v := clampVolume(*saved.Volume)
+				c.Volume = &v
+			}
+			c.Repeat = string(player.ParseRepeat(saved.Repeat))
+			c.Shuffle = saved.Shuffle
 		}
 	}
 	return c
@@ -83,6 +96,30 @@ func loadConfig() config {
 
 func clampConcurrency(n int) int {
 	return max(minConcurrency, min(maxConcurrency, n))
+}
+
+const defaultVolume = 0.8
+
+func clampVolume(v float64) float64 {
+	if v != v {
+		return defaultVolume
+	}
+	return max(0, min(1, v))
+}
+
+func (c config) volume() float64 {
+	if c.Volume == nil {
+		return defaultVolume
+	}
+	return *c.Volume
+}
+
+func playQuality(s string) yam.Quality {
+	switch yam.Quality(s) {
+	case yam.MP3, yam.Low:
+		return yam.Quality(s)
+	}
+	return yam.Lossless
 }
 
 func (c config) quality() yam.Quality {

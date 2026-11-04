@@ -8,13 +8,17 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
+import android.provider.DocumentsContract
 import android.provider.Settings
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
+import java.io.File
 
 class MainActivity : FlutterActivity() {
+    private var pendingPick: MethodChannel.Result? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
@@ -44,6 +48,8 @@ class MainActivity : FlutterActivity() {
         MethodChannel(messenger, "yamd/android").setMethodCallHandler { call, result ->
             when (call.method) {
                 "open" -> result.success(open(call.arguments as String))
+                "openFolder" -> result.success(openFolder(call.arguments as String))
+                "pickFolder" -> pickFolder(call.arguments as String?, result)
                 "storageGranted" -> result.success(storageGranted())
                 "requestStorage" -> {
                     requestStorage()
@@ -66,6 +72,105 @@ class MainActivity : FlutterActivity() {
         false
     }
 
+    private fun documentId(path: String): String? {
+        val primary = Environment.getExternalStorageDirectory().path
+        return when {
+            path == primary -> "primary:"
+            path.startsWith("$primary/") -> "primary:" + path.removePrefix("$primary/")
+            path.startsWith("/storage/") -> {
+                val rest = path.removePrefix("/storage/")
+                rest.substringBefore('/') + ":" + rest.substringAfter('/', "")
+            }
+            else -> null
+        }
+    }
+
+    private fun documentUri(path: String): Uri? =
+        documentId(path.trimEnd('/'))?.let { DocumentsContract.buildDocumentUri(EXTERNAL_DOCS, it) }
+
+    private fun openFolder(path: String): Boolean {
+        var dir = File(path)
+        if (dir.isFile) dir = dir.parentFile ?: dir
+        while (!dir.exists() && dir.parentFile != null) dir = dir.parentFile!!
+        val attempts = mutableListOf<Intent>()
+        documentUri(dir.path)?.let {
+            attempts += Intent(Intent.ACTION_VIEW).setDataAndType(it, DocumentsContract.Document.MIME_TYPE_DIR)
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        attempts += Intent(Intent.ACTION_VIEW).setDataAndType(Uri.parse(dir.path), "resource/folder")
+        for (intent in attempts) {
+            try {
+                startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                return true
+            } catch (e: ActivityNotFoundException) {
+                continue
+            } catch (e: SecurityException) {
+                continue
+            }
+        }
+        return false
+    }
+
+    private fun pickFolder(initial: String?, result: MethodChannel.Result) {
+        pendingPick?.success(null)
+        pendingPick = result
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !initial.isNullOrEmpty()) {
+            documentUri(initial)?.let { intent.putExtra(DocumentsContract.EXTRA_INITIAL_URI, it) }
+        }
+        try {
+            startActivityForResult(intent, PICK_FOLDER)
+        } catch (e: ActivityNotFoundException) {
+            pendingPick = null
+            result.error("unavailable", "На телефоне нет системного выбора папок", null)
+        }
+    }
+
+    @Deprecated("FlutterActivity is not a ComponentActivity")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != PICK_FOLDER) return
+        val result = pendingPick ?: return
+        pendingPick = null
+        val uri = data?.data
+        if (resultCode != RESULT_OK || uri == null) {
+            result.success(null)
+            return
+        }
+        val path = treePath(uri)
+        if (path == null) {
+            result.error("unsupported", "Эту папку нельзя выбрать. Выберите папку во внутренней памяти или на карте памяти", null)
+        } else {
+            result.success(path)
+        }
+    }
+
+    private fun treePath(uri: Uri): String? {
+        val id = try {
+            DocumentsContract.getTreeDocumentId(uri)
+        } catch (e: IllegalArgumentException) {
+            return null
+        }
+        return when (uri.authority) {
+            EXTERNAL_DOCS -> {
+                val volume = id.substringBefore(':')
+                val rel = id.substringAfter(':', "")
+                val root = if (volume.equals("primary", ignoreCase = true)) {
+                    Environment.getExternalStorageDirectory().path
+                } else {
+                    "/storage/$volume"
+                }
+                if (rel.isEmpty()) root else "$root/$rel"
+            }
+            DOWNLOAD_DOCS -> when {
+                id.startsWith("raw:") -> id.removePrefix("raw:")
+                id == "downloads" -> Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).path
+                else -> null
+            }
+            else -> null
+        }
+    }
+
     private fun storageGranted(): Boolean = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
         Environment.isExternalStorageManager()
     } else {
@@ -83,5 +188,11 @@ class MainActivity : FlutterActivity() {
         } else {
             requestPermissions(arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE), 2)
         }
+    }
+
+    companion object {
+        private const val PICK_FOLDER = 41
+        private const val EXTERNAL_DOCS = "com.android.externalstorage.documents"
+        private const val DOWNLOAD_DOCS = "com.android.providers.downloads.documents"
     }
 }

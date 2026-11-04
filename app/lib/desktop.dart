@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/services.dart';
 
 class Desktop {
@@ -8,8 +9,6 @@ class Desktop {
   static const restartFlag = '--restart';
   static const _channel = MethodChannel('yamd/desktop');
   static const _android = MethodChannel('yamd/android');
-
-  bool get canReveal => !Platform.isAndroid;
 
   Future<bool> storageGranted() async {
     if (!Platform.isAndroid) return true;
@@ -50,10 +49,17 @@ class Desktop {
 
   void showWindow() => _call('show');
 
-  void open(String target) {
+  Future<bool> _androidCall(String method, String arg) async {
+    try {
+      return await _android.invokeMethod<bool>(method, arg) ?? false;
+    } on MissingPluginException {
+      return false;
+    }
+  }
+
+  Future<bool> open(String target) async {
     if (Platform.isAndroid) {
-      _android.invokeMethod<bool>('open', target);
-      return;
+      return _androidCall(target.startsWith('/') ? 'openFolder' : 'open', target);
     }
     if (Platform.isWindows) {
       if (target.startsWith('http')) {
@@ -61,20 +67,27 @@ class Desktop {
       } else {
         Process.run('explorer.exe', [target]);
       }
-      return;
+      return true;
     }
     Process.run(Platform.isMacOS ? 'open' : 'xdg-open', [target]);
+    return true;
   }
 
-  void reveal(String file) {
-    if (Platform.isAndroid) return;
+  Future<bool> reveal(String file) async {
+    if (Platform.isAndroid) return _androidCall('openFolder', file);
     if (Platform.isWindows) {
       Process.run('explorer.exe', ['/select,', file]);
     } else if (Platform.isMacOS) {
       Process.run('open', ['-R', file]);
     } else {
-      open(File(file).parent.path);
+      return open(File(file).parent.path);
     }
+    return true;
+  }
+
+  Future<String?> pickFolder(String current) async {
+    if (!Platform.isAndroid) return getDirectoryPath(initialDirectory: current.isEmpty ? null : current);
+    return _android.invokeMethod<String>('pickFolder', current);
   }
 
   Future<void> quit() async {

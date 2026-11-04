@@ -15,6 +15,7 @@ type Track struct {
 	AlbumID     string
 	Title       string
 	Artists     string
+	ArtistRefs  []ArtistRef
 	Album       string
 	AlbumArtist string
 	Year        int
@@ -24,14 +25,21 @@ type Track struct {
 	TrackTotal  int
 	DiscTotal   int
 	Cover       string
+	Duration    int
 	Available   bool
 	Explicit    bool
+}
+
+type ArtistRef struct {
+	ID   string
+	Name string
 }
 
 type Release struct {
 	Kind       Kind
 	Title      string
 	Artist     string
+	Artists    []ArtistRef
 	Year       int
 	Cover      string
 	TrackCount int
@@ -41,7 +49,9 @@ type Release struct {
 }
 
 type apiArtist struct {
-	Name string `json:"name"`
+	ID      flexID `json:"id"`
+	Name    string `json:"name"`
+	Various bool   `json:"various"`
 }
 
 type apiAlbum struct {
@@ -74,6 +84,20 @@ type apiTrack struct {
 	Albums    []apiAlbum  `json:"albums"`
 	Warning   string      `json:"contentWarning"`
 	Explicit  bool        `json:"explicit"`
+	Duration  int         `json:"durationMs"`
+	Source    string      `json:"trackSource"`
+}
+
+var uploadExts = []string{".mp3", ".flac", ".m4a", ".aac", ".ogg", ".opus", ".wav"}
+
+func uploadTitle(title string) string {
+	lower := strings.ToLower(title)
+	for _, ext := range uploadExts {
+		if strings.HasSuffix(lower, ext) && len(title) > len(ext) {
+			return strings.TrimSpace(title[:len(title)-len(ext)])
+		}
+	}
+	return title
 }
 
 func joinArtists(artists []apiArtist) string {
@@ -84,6 +108,18 @@ func joinArtists(artists []apiArtist) string {
 		}
 	}
 	return strings.Join(names, ", ")
+}
+
+func artistRefs(artists []apiArtist) []ArtistRef {
+	var out []ArtistRef
+	for _, a := range artists {
+		n := strings.TrimSpace(a.Name)
+		if a.ID == "" || a.ID == "0" || n == "" || a.Various {
+			continue
+		}
+		out = append(out, ArtistRef{ID: string(a.ID), Name: n})
+	}
+	return out
 }
 
 func (a apiAlbum) info(id string) AlbumInfo {
@@ -130,17 +166,23 @@ func (t apiTrack) shape(album *apiAlbum) Track {
 
 		artists = albumTitle
 	}
+	title := t.Title
+	if t.Source == "UGC" {
+		title = uploadTitle(title)
+	}
 	tr := Track{
 		ID:          id,
 		AlbumID:     string(album.ID),
-		Title:       withVersion(t.Title, t.Version),
+		Title:       withVersion(title, t.Version),
 		Artists:     artists,
+		ArtistRefs:  artistRefs(t.Artists),
 		Album:       albumTitle,
 		AlbumArtist: joinArtists(album.Artists),
 		Year:        int(album.Year),
 		Genre:       album.Genre,
 		TrackTotal:  album.TrackCount,
 		Cover:       t.CoverURI,
+		Duration:    t.Duration,
 		Available:   t.Available == nil || *t.Available,
 		Explicit:    t.Explicit || t.Warning == "explicit",
 	}
@@ -213,6 +255,7 @@ func (c *Client) resolveTrack(ctx context.Context, l Link) (*Release, error) {
 		Kind:       KindTrack,
 		Title:      tr.Title,
 		Artist:     tr.Artists,
+		Artists:    tr.ArtistRefs,
 		Year:       tr.Year,
 		Cover:      tr.Cover,
 		TrackCount: 1,
@@ -234,6 +277,7 @@ func (c *Client) resolveAlbum(ctx context.Context, albumID string, withTracks bo
 		Kind:       KindAlbum,
 		Title:      withVersion(a.Title, a.Version),
 		Artist:     joinArtists(a.Artists),
+		Artists:    artistRefs(a.Artists),
 		Year:       int(a.Year),
 		Cover:      a.CoverURI,
 		TrackCount: a.TrackCount,

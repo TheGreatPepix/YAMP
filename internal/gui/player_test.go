@@ -1,0 +1,348 @@
+package gui
+
+import (
+	"bytes"
+	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	"encoding/hex"
+	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
+	"ymd/internal/yam"
+)
+
+type fakeMusic struct {
+	srv   *httptest.Server
+	key   []byte
+	plain []byte
+	enc   []byte
+
+	mu       sync.Mutex
+	feedback []string
+	plays    []string
+	likes    []string
+	waveCall int
+}
+
+func newFakeMusic(t *testing.T) *fakeMusic {
+	f := &fakeMusic{key: bytes.Repeat([]byte{7}, 16), plain: bytes.Repeat([]byte("audio-frame-"), 4000)}
+	block, _ := aes.NewCipher(f.key)
+	f.enc = make([]byte, len(f.plain))
+	cipher.NewCTR(block, make([]byte, 16)).XORKeyStream(f.enc, f.plain)
+	track := func(id string) string {
+		return `{"id":"` + id + `","title":"T` + id + `","durationMs":200000,"artists":[{"name":"A"}],"albums":[{"id":9,"title":"Al"}]}`
+	}
+	f.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		f.mu.Lock()
+		defer f.mu.Unlock()
+		r.ParseForm()
+		switch r.URL.Path {
+		case "/account/status":
+			w.Write([]byte(`{"result":{"account":{"uid":5,"login":"me"},"plus":{"hasPlus":true}}}`))
+		case "/users/5/likes/tracks":
+			w.Write([]byte(`{"result":{"library":{"tracks":[{"id":"20"}]}}}`))
+		case "/users/5/dislikes/tracks":
+			w.Write([]byte(`{"result":{"library":{"tracks":[]}}}`))
+		case "/users/5/likes/tracks/add-multiple", "/users/5/likes/tracks/remove", "/users/5/dislikes/tracks/add-multiple":
+			f.likes = append(f.likes, strings.TrimPrefix(r.URL.Path, "/users/5/")+"="+r.PostForm.Get("track-ids"))
+			w.Write([]byte(`{"result":{"revision":1}}`))
+		case "/rotor/session/new":
+			w.Write([]byte(`{"result":{"radioSessionId":"S","batchId":"B1","sequence":[{"type":"track","track":` + track("1") + `},{"type":"track","track":` + track("2") + `}]}}`))
+		case "/rotor/session/S/tracks":
+			f.waveCall++
+			id := []string{"3", "4", "5"}[min(f.waveCall-1, 2)]
+			w.Write([]byte(`{"result":{"batchId":"B2","sequence":[{"type":"track","track":` + track(id) + `}]}}`))
+		case "/rotor/session/S/feedback":
+			var body struct {
+				Event struct {
+					Type    string `json:"type"`
+					TrackID string `json:"trackId"`
+				} `json:"event"`
+				BatchID string `json:"batchId"`
+			}
+			json.NewDecoder(r.Body).Decode(&body)
+			f.feedback = append(f.feedback, body.Event.Type+":"+body.Event.TrackID+"@"+body.BatchID)
+			w.Write([]byte(`{"result":{}}`))
+		case "/play-audio":
+			f.plays = append(f.plays, r.PostForm.Get("track-id")+"/"+r.PostForm.Get("from"))
+			w.Write([]byte(`{"result":"ok"}`))
+		case "/albums/9/with-tracks":
+			w.Write([]byte(`{"result":{"id":9,"title":"Al","coverUri":"c/%%","artists":[{"id":3,"name":"A"}],"volumes":[[` + track("20") + `]]}}`))
+		case "/artists/3/brief-info":
+			w.Write([]byte(`{"result":{"artist":{"name":"A"}}}`))
+		case "/artists/3/direct-albums":
+			w.Write([]byte(`{"result":{"albums":[{"id":9,"title":"Al","coverUri":"c/%%","year":2001}],"pager":{"total":1}}}`))
+		case "/artists/3/tracks":
+			w.Write([]byte(`{"result":{"tracks":[` + track("20") + `,` + track("21") + `]}}`))
+		case "/users/me/playlists/1001":
+			w.Write([]byte(`{"result":{"title":"Дорога","trackCount":3,"tracks":[{"track":` + track("20") + `},{"track":` + track("21") + `},{"track":` + track("22") + `}]}}`))
+		case "/get-file-info":
+			json.NewEncoder(w).Encode(map[string]any{"result": map[string]any{"downloadInfo": map[string]any{
+				"codec": "flac-mp4", "key": hex.EncodeToString(f.key), "urls": []string{f.srv.URL + "/file/" + r.URL.Query().Get("trackId")},
+			}}})
+		default:
+			if strings.HasPrefix(r.URL.Path, "/file/") {
+				http.ServeContent(w, r, "", time.Time{}, bytes.NewReader(f.enc))
+				return
+			}
+			http.NotFound(w, r)
+		}
+	}))
+	return f
+}
+
+func (f *fakeMusic) snapshot() (feedback, plays, likes []string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.feedback...), append([]string(nil), f.plays...), append([]string(nil), f.likes...)
+}
+
+type eventLog struct {
+	ch chan map[string]any
+}
+
+func (e *eventLog) wait(t *testing.T, typ string, ok func(map[string]any) bool) map[string]any {
+	t.Helper()
+	deadline := time.After(5 * time.Second)
+	for {
+		select {
+		case ev := <-e.ch:
+			if ev["type"] == typ && (ok == nil || ok(ev)) {
+				return ev
+			}
+		case <-deadline:
+			t.Fatalf("не дождались события %s", typ)
+			return nil
+		}
+	}
+}
+
+func playing(id, action string) func(map[string]any) bool {
+	return func(ev map[string]any) bool {
+		tr, _ := ev["track"].(map[string]any)
+		return tr != nil && tr["id"] == id && ev["action"] == action
+	}
+}
+
+func startPlayerCore(t *testing.T) (*Core, *fakeMusic, *eventLog) {
+	dir := t.TempDir()
+	for _, v := range []string{"AppData", "HOME", "XDG_CONFIG_HOME"} {
+		t.Setenv(v, dir)
+	}
+	f := newFakeMusic(t)
+	t.Cleanup(f.srv.Close)
+	old := yam.APIBase
+	yam.APIBase = f.srv.URL
+	t.Cleanup(func() { yam.APIBase = old })
+
+	log := &eventLog{ch: make(chan map[string]any, 256)}
+	c := Start(func(b []byte) {
+		var ev map[string]any
+		if json.Unmarshal(b, &ev) == nil {
+			select {
+			case log.ch <- ev:
+			default:
+			}
+		}
+	})
+	c.app.upd.mu.Lock()
+	c.app.upd.checked = true
+	c.app.upd.mu.Unlock()
+	sess, _, err := yam.Open(context.Background(), "t")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.app.mu.Lock()
+	c.app.session, c.app.token = sess, "t"
+	c.app.mu.Unlock()
+	t.Cleanup(func() {
+		c.Close()
+		c.Wait()
+	})
+	return c, f, log
+}
+
+func send(c *Core, cmd map[string]any) {
+	b, _ := json.Marshal(cmd)
+	c.Send(b)
+}
+
+func TestPlayerWave(t *testing.T) {
+	c, f, log := startPlayerCore(t)
+
+	send(c, map[string]any{"cmd": "play", "source": "wave"})
+	log.wait(t, "player", func(ev map[string]any) bool { return ev["loading"] == true })
+	ev := log.wait(t, "player", playing("1", "play"))
+	if ev["wave"] != true || ev["quality"] != "lossless" || ev["volume"] != 0.8 {
+		t.Fatalf("состояние волны = %v", ev)
+	}
+	next, _ := ev["next"].(map[string]any)
+	if next == nil || next["id"] != "2" || ev["nextUrl"] == "" {
+		t.Errorf("следующий = %v", ev["next"])
+	}
+	format := log.wait(t, "playerFormat", nil)
+	if format["track"] != "1" || format["format"] != "FLAC" {
+		t.Errorf("формат = %v", format)
+	}
+
+	resp, err := http.Get(ev["url"].(string))
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if !bytes.Equal(body, f.plain) {
+		t.Fatalf("поток не расшифрован: %d байт", len(body))
+	}
+
+	send(c, map[string]any{"cmd": "playerStarted", "track": "1"})
+	send(c, map[string]any{"cmd": "playerEnded", "track": "1", "position": 200})
+	log.wait(t, "player", playing("2", "play"))
+	log.wait(t, "queue", func(ev map[string]any) bool { return len(ev["tracks"].([]any)) == 3 })
+
+	send(c, map[string]any{"cmd": "playerEnded", "track": "1", "position": 200})
+	send(c, map[string]any{"cmd": "dislike", "track": "2", "on": true, "position": 12})
+	mark := log.wait(t, "mark", nil)
+	if mark["track"] != "2" || mark["disliked"] != true {
+		t.Errorf("дизлайк = %v", mark)
+	}
+	log.wait(t, "player", playing("3", "play"))
+
+	send(c, map[string]any{"cmd": "playerRepeat", "repeat": "all"})
+	rep := log.wait(t, "player", func(ev map[string]any) bool { return ev["action"] == nil })
+	if rep["repeat"] != "off" {
+		t.Errorf("в волне повтор всего = %v", rep["repeat"])
+	}
+	send(c, map[string]any{"cmd": "playerEnded", "track": "3", "position": 200})
+	log.wait(t, "player", playing("4", "play"))
+
+	deadline := time.Now().Add(3 * time.Second)
+	for {
+		feedback, plays, likes := f.snapshot()
+		want := "radioStarted:@B1 trackStarted:1@B1 trackFinished:1@B1 skip:2@B1 trackFinished:3@B2"
+		if strings.Join(feedback, " ") == want && len(plays) == 3 && len(likes) == 1 {
+			if plays[0] != "1/"+yam.WaveFrom || likes[0] != "dislikes/tracks/add-multiple=2" {
+				t.Errorf("история %v, отметки %v", plays, likes)
+			}
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("отзывы %v, история %v, отметки %v", feedback, plays, likes)
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+}
+
+func TestPlayerPlaylist(t *testing.T) {
+	c, f, log := startPlayerCore(t)
+	link := "https://music.yandex.ru/users/me/playlists/1001"
+
+	send(c, map[string]any{"cmd": "open", "source": link})
+	list := log.wait(t, "tracks", nil)
+	items := list["tracks"].([]any)
+	if len(items) != 3 || items[0].(map[string]any)["liked"] != true || items[1].(map[string]any)["liked"] != nil {
+		t.Fatalf("плейлист = %v", list)
+	}
+
+	send(c, map[string]any{"cmd": "play", "source": link, "track": "21"})
+	ev := log.wait(t, "player", playing("21", "play"))
+	if src := ev["source"].(map[string]any); src["title"] != "Дорога" || ev["wave"] != false {
+		t.Errorf("источник = %v", ev["source"])
+	}
+
+	send(c, map[string]any{"cmd": "playerRepeat", "repeat": "one"})
+	log.wait(t, "player", func(ev map[string]any) bool { return ev["repeat"] == "one" })
+	send(c, map[string]any{"cmd": "playerEnded", "track": "21", "position": 200})
+	log.wait(t, "player", playing("21", "play"))
+	send(c, map[string]any{"cmd": "playerNext", "track": "21", "position": 5})
+	log.wait(t, "player", playing("22", "play"))
+	send(c, map[string]any{"cmd": "playerPrev", "track": "22", "position": 10})
+	log.wait(t, "player", playing("22", "play"))
+	send(c, map[string]any{"cmd": "playerPrev", "track": "22", "position": 1})
+	log.wait(t, "player", playing("21", "play"))
+
+	send(c, map[string]any{"cmd": "like", "track": "21", "on": true})
+	mark := log.wait(t, "mark", nil)
+	if mark["liked"] != true || mark["likedCount"] != 2.0 {
+		t.Errorf("лайк = %v", mark)
+	}
+
+	send(c, map[string]any{"cmd": "playerQuality", "quality": "low"})
+	ev = log.wait(t, "player", playing("21", "resume"))
+	if ev["quality"] != "low" || !strings.HasSuffix(ev["url"].(string), "/21?q=low") {
+		t.Errorf("качество = %v %v", ev["quality"], ev["url"])
+	}
+	send(c, map[string]any{"cmd": "playerVolume", "volume": 1.7})
+	send(c, map[string]any{"cmd": "playerState"})
+	if ev := log.wait(t, "player", nil); ev["volume"] != 1.0 {
+		t.Errorf("громкость = %v", ev["volume"])
+	}
+	cfg := loadConfig()
+	if cfg.PlayQuality != "low" || cfg.volume() != 1 || cfg.Repeat != "one" {
+		t.Errorf("настройки не сохранились: %+v", cfg)
+	}
+
+	send(c, map[string]any{"cmd": "logout"})
+	log.wait(t, "player", func(ev map[string]any) bool { return ev["action"] == "stop" && ev["track"] == nil })
+
+	deadline := time.Now().Add(3 * time.Second)
+	for {
+		_, plays, likes := f.snapshot()
+		if len(likes) == 1 && len(plays) == 3 {
+			if likes[0] != "likes/tracks/add-multiple=21" {
+				t.Errorf("отметки %v", likes)
+			}
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("история %v, отметки %v", plays, likes)
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+}
+
+func TestPlayTrackLinks(t *testing.T) {
+	p := newPlayerState(config{})
+	pt := p.shape(yam.Track{ID: "5", AlbumID: "9", Artists: "Кино", ArtistRefs: []yam.ArtistRef{{ID: "3", Name: "Кино"}}}, "200x200")
+	if pt.AlbumSource != "https://music.yandex.ru/album/9" || pt.Link != "https://music.yandex.ru/album/9/track/5" {
+		t.Errorf("ссылки = %q %q", pt.AlbumSource, pt.Link)
+	}
+	if len(pt.Artists) != 1 || pt.Artists[0] != (playArtist{Name: "Кино", Source: "https://music.yandex.ru/artist/3"}) {
+		t.Errorf("исполнители = %+v", pt.Artists)
+	}
+	if bare := p.shape(yam.Track{ID: "6"}, ""); bare.AlbumSource != "" || bare.Artists != nil {
+		t.Errorf("без альбома и исполнителей = %+v", bare)
+	}
+}
+
+func TestPlayerOpenAlbumsOnlyForArtist(t *testing.T) {
+	c, _, log := startPlayerCore(t)
+	open := func(source string) map[string]any {
+		send(c, map[string]any{"cmd": "open", "source": source})
+		return log.wait(t, "tracks", func(ev map[string]any) bool { return ev["source"] == source })
+	}
+	album := open("https://music.yandex.ru/album/9")
+	if _, ok := album["albums"]; ok {
+		t.Errorf("у альбома не должно быть списка альбомов: %v", album["albums"])
+	}
+	info := album["info"].(map[string]any)
+	if a := info["artists"].([]any)[0].(map[string]any); a["source"] != "https://music.yandex.ru/artist/3" {
+		t.Errorf("исполнитель альбома = %v", a)
+	}
+	artist := open("https://music.yandex.ru/artist/3")
+	albums, _ := artist["albums"].([]any)
+	if len(albums) != 1 || albums[0].(map[string]any)["cover"] != "https://c/400x400" {
+		t.Errorf("альбомы исполнителя = %v", artist["albums"])
+	}
+	top := open("https://music.yandex.ru/artist/3/tracks")
+	if _, ok := top["albums"]; ok || len(top["tracks"].([]any)) != 2 {
+		t.Errorf("популярные треки = %v", top)
+	}
+}

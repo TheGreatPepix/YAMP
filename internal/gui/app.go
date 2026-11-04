@@ -26,6 +26,9 @@ type App struct {
 	jobs *manager
 	upd  selfUpdate
 
+	player *playerState
+	stream *streamServer
+
 	mu      sync.Mutex
 	cfg     config
 	token   string
@@ -48,7 +51,8 @@ type accountEvent struct {
 }
 
 func newApp() *App {
-	g := &App{cfg: loadConfig()}
+	g := &App{cfg: loadConfig(), stream: newStreamServer()}
+	g.player = newPlayerState(g.cfg)
 	g.token = g.cfg.token()
 	g.account = accountEvent{Type: "account", Status: accNone}
 	return g
@@ -156,6 +160,7 @@ func (g *App) accountLost(err error) {
 	g.mu.Unlock()
 
 	g.jobs.cancel(0)
+	g.playerReset()
 	ev := accountEvent{Status: accError, Message: err.Error(), Login: acc.Login, Name: acc.Name}
 	if errors.Is(err, yam.ErrNoPlus) {
 		ev.Status, ev.HasPlus = accNoPlus, false
@@ -190,6 +195,7 @@ func (g *App) logout() {
 	if revoke != "" {
 		g.revoke(revoke)
 	}
+	g.playerReset()
 	g.setAccount(accountEvent{Status: accNone})
 }
 

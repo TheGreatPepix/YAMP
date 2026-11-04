@@ -107,7 +107,7 @@ func (c *Client) Search(ctx context.Context, text string, kind Kind, page int) (
 			Type   string          `json:"type"`
 			Result json.RawMessage `json:"result"`
 		} `json:"best"`
-		Tracks    *rawSection[apiSearchTrack]    `json:"tracks"`
+		Tracks    *rawSection[apiTrack]          `json:"tracks"`
 		Albums    *rawSection[apiAlbum]          `json:"albums"`
 		Artists   *rawSection[apiSearchArtist]   `json:"artists"`
 		Playlists *rawSection[apiSearchPlaylist] `json:"playlists"`
@@ -120,7 +120,7 @@ func (c *Client) Search(ctx context.Context, text string, kind Kind, page int) (
 		res.Corrected = r.MisspellResult
 	}
 	if r.Tracks != nil {
-		res.Sections[KindTrack] = section(r.Tracks, func(t apiSearchTrack) Hit { return trackHit(t) })
+		res.Sections[KindTrack] = section(r.Tracks, func(t apiTrack) Hit { return trackHit(t) })
 	}
 	if r.Albums != nil {
 		res.Sections[KindAlbum] = section(r.Albums, albumHit)
@@ -151,7 +151,7 @@ func bestHit(typ string, raw json.RawMessage) *Hit {
 	var h Hit
 	switch typ {
 	case "track":
-		var t apiSearchTrack
+		var t apiTrack
 		if json.Unmarshal(raw, &t) != nil {
 			return nil
 		}
@@ -183,7 +183,7 @@ func bestHit(typ string, raw json.RawMessage) *Hit {
 	return &h
 }
 
-func trackHit(t apiSearchTrack) Hit {
+func trackHit(t apiTrack) Hit {
 	if len(t.Albums) > 0 && t.Albums[0].MetaType == "podcast" {
 		return Hit{}
 	}
@@ -197,7 +197,7 @@ func trackHit(t apiSearchTrack) Hit {
 		Year:     tr.Year,
 		Cover:    tr.Cover,
 		Count:    1,
-		Duration: t.DurationMs / 1000,
+		Duration: tr.Duration / 1000,
 		Explicit: tr.Explicit,
 	}
 	switch {

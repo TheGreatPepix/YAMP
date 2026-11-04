@@ -167,7 +167,7 @@ func result(path, format string) Result {
 }
 
 func (s *Session) stream(ctx context.Context, src source, dst string, progress ProgressFunc) (int64, error) {
-	req, err := s.newRequest(ctx, http.MethodGet, src.URL, nil, false)
+	req, err := s.newRequest(ctx, http.MethodGet, src.URL, nil, "", false)
 	if err != nil {
 		return 0, err
 	}

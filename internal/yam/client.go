@@ -1,6 +1,7 @@
 package yam
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -13,9 +14,9 @@ import (
 	"time"
 )
 
-const (
-	APIBase = "https://api.music.yandex.net"
+var APIBase = "https://api.music.yandex.net"
 
+const (
 	userAgent    = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) YAMD/2.0"
 	clientHeader = "YandexMusicAndroid/24023621"
 )
@@ -67,19 +68,22 @@ func New(token string) *Client {
 	return &Client{token: strings.TrimSpace(token), http: defaultHTTP, base: APIBase}
 }
 
-func (c *Client) newRequest(ctx context.Context, method, rawURL string, form url.Values, auth bool) (*http.Request, error) {
-	var body io.Reader
-	if form != nil {
-		body = strings.NewReader(form.Encode())
+func formBody(form url.Values) (io.Reader, string) {
+	if form == nil {
+		return nil, ""
 	}
+	return strings.NewReader(form.Encode()), "application/x-www-form-urlencoded"
+}
+
+func (c *Client) newRequest(ctx context.Context, method, rawURL string, body io.Reader, contentType string, auth bool) (*http.Request, error) {
 	req, err := http.NewRequestWithContext(ctx, method, rawURL, body)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("User-Agent", userAgent)
 	req.Header.Set("X-Yandex-Music-Client", clientHeader)
-	if form != nil {
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
 	}
 
 	if auth {
@@ -92,7 +96,12 @@ func (c *Client) newRequest(ctx context.Context, method, rawURL string, form url
 }
 
 func (c *Client) fetch(ctx context.Context, method, rawURL string, form url.Values, auth bool) ([]byte, error) {
-	req, err := c.newRequest(ctx, method, rawURL, form, auth)
+	body, contentType := formBody(form)
+	return c.send(ctx, method, rawURL, body, contentType, auth)
+}
+
+func (c *Client) send(ctx context.Context, method, rawURL string, body io.Reader, contentType string, auth bool) ([]byte, error) {
+	req, err := c.newRequest(ctx, method, rawURL, body, contentType, auth)
 	if err != nil {
 		return nil, err
 	}
@@ -119,6 +128,22 @@ func (c *Client) api(ctx context.Context, method, path string, form url.Values, 
 	if err != nil {
 		return err
 	}
+	return decodeResult(b, out)
+}
+
+func (c *Client) postJSON(ctx context.Context, path string, in, out any) error {
+	data, err := json.Marshal(in)
+	if err != nil {
+		return err
+	}
+	b, err := c.send(ctx, http.MethodPost, c.base+path, bytes.NewReader(data), "application/json", true)
+	if err != nil {
+		return err
+	}
+	return decodeResult(b, out)
+}
+
+func decodeResult(b []byte, out any) error {
 	var envelope struct {
 		Result json.RawMessage `json:"result"`
 		Error  json.RawMessage `json:"error"`

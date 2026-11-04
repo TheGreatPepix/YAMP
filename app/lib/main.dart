@@ -7,13 +7,17 @@ import 'core/android_core.dart';
 import 'core/core.dart';
 import 'core/fake_core.dart';
 import 'desktop.dart';
+import 'player/engine.dart';
 import 'state/controller.dart';
 
 Future<void> main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
   final exe = Platform.resolvedExecutable;
   final Core core;
-  if (args.contains('--demo') || const bool.fromEnvironment('YMD_DEMO')) {
+  final demo = args.contains('--demo') || const bool.fromEnvironment('YMD_DEMO');
+  if (!demo) MediaKitEngine.init();
+  final AudioEngine engine = demo ? SilentEngine(tick: const Duration(milliseconds: 250)) : MediaKitEngine();
+  if (demo) {
     core = FakeCore();
   } else if (Platform.isAndroid) {
     core = AndroidCore();
@@ -21,7 +25,7 @@ Future<void> main(List<String> args) async {
     final path = Platform.environment['YMCORE'] ?? ProcessCore.beside(exe);
     core = path == null ? _MissingCore() : await ProcessCore.start(path);
   }
-  runApp(YmdApp(controller: Controller(core, desktop: Desktop(args: args))));
+  runApp(YmdApp(controller: Controller(core, desktop: Desktop(args: args), engine: engine)));
 }
 
 class _MissingCore implements Core {

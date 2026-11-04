@@ -1,17 +1,30 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 
 import '../core/core.dart';
 import '../desktop.dart';
+import '../player/engine.dart';
 import 'draft.dart';
 import 'models.dart';
 import 'picker.dart';
+import 'player.dart';
 import 'search.dart';
 
+enum Section { download, listen }
+
 class Controller extends ChangeNotifier {
-  Controller(this.core, {Desktop? desktop}) : desktop = desktop ?? Desktop() {
+  Controller(this.core, {Desktop? desktop, AudioEngine? engine})
+      : desktop = desktop ?? Desktop(),
+        player = PlayerState(core.send, engine ?? SilentEngine()) {
     _sub = core.events.listen(_receive);
+    player.panelOpen.addListener(() {
+      if (player.panelOpen.value) downloadsOpen.value = false;
+    });
+    downloadsOpen.addListener(() {
+      if (downloadsOpen.value) player.panelOpen.value = false;
+    });
     this.desktop.listen(exit: _trayExit);
   }
 
@@ -46,6 +59,8 @@ class Controller extends ChangeNotifier {
   final drafts = ValueNotifier<List<Draft>>(const []);
   final selected = ValueNotifier<Draft?>(null);
   final downloadsOpen = ValueNotifier(false);
+  final section = ValueNotifier(Section.download);
+  final PlayerState player;
   late final search = SearchState(send);
 
   final _jobs = <int, Job>{};
@@ -323,9 +338,29 @@ class Controller extends ChangeNotifier {
     updateProgress.value = total > 0 ? (done / total).clamp(0.0, 1.0) : null;
   }
 
-  void openFolder(String path) => desktop.open(path);
+  Future<void> openFolder(String path) async {
+    if (!await desktop.open(path)) _folderMissing(path);
+  }
 
-  void reveal(String file) => desktop.reveal(file);
+  Future<void> reveal(String file) async {
+    if (!await desktop.reveal(file)) _folderMissing(file);
+  }
+
+  void _folderMissing(String path) => _notices.add(
+        Notice(
+          'Не нашлось приложения, чтобы открыть папку. Файлы лежат здесь: $path',
+          kind: NoticeKind.error,
+        ),
+      );
+
+  Future<void> chooseDir() async {
+    try {
+      final path = await desktop.pickFolder(dir);
+      if (path != null && path.isNotEmpty) setDir(path);
+    } on PlatformException catch (e) {
+      _notices.add(Notice(e.message ?? 'Не удалось выбрать папку', kind: NoticeKind.error));
+    }
+  }
 
   void openLink(String url) => desktop.open(url);
 
@@ -343,8 +378,38 @@ class Controller extends ChangeNotifier {
     log.value = s;
   }
 
+  void listen() {
+    section.value = Section.listen;
+    player.loadLibrary();
+  }
+
+  void openPage(String source) {
+    if (source.isEmpty) return;
+    final fresh = section.value != Section.listen || !player.browsing.value;
+    player.panelOpen.value = false;
+    if (search.open) search.close();
+    listen();
+    player.browseTo(source, fromLibrary: fresh);
+  }
+
+  void openHit(SearchHit hit) {
+    if (section.value != Section.listen) {
+      toggleHit(hit);
+      return;
+    }
+    if (hit.kind == ReleaseKind.track) {
+      player.play(hit.link);
+      return;
+    }
+    search.close();
+    player.browseTo(hit.link);
+  }
+
   void _receive(Event ev) {
     switch (ev['type']) {
+      case 'player' || 'queue' || 'playerFormat' || 'mark' || 'library' || 'tracks':
+        player.receive(ev);
+        return;
       case 'state':
         dir = '${ev['dir'] ?? ''}';
         theme = switch ('${ev['theme']}') {
@@ -451,6 +516,8 @@ class Controller extends ChangeNotifier {
     drafts.dispose();
     selected.dispose();
     downloadsOpen.dispose();
+    section.dispose();
+    player.dispose();
     stats.dispose();
     log.dispose();
     device.dispose();

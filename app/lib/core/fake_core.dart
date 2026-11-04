@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'core.dart';
+import 'fake_player.dart';
 
 class FakeCore implements Core {
   FakeCore({this.tick = const Duration(milliseconds: 120), this.latest = '2.2.0'});
@@ -20,6 +21,7 @@ class FakeCore implements Core {
   var _plus = false;
   var _deviceSeq = 0;
   Map<String, Object?>? lastDownload;
+  late final player = FakePlayer(_emit, _later);
 
   static const _albums = [
     {'id': '10', 'title': 'Группа крови', 'year': 1988, 'count': 11, 'type': 'album'},
@@ -55,10 +57,12 @@ class FakeCore implements Core {
 
   @override
   void send(Map<String, Object?> c) {
+    if (player.handle(c)) return;
     switch (c['cmd']) {
       case 'ready':
         _emit(_state());
         _emit({'type': 'account', 'status': 'none'});
+        player.emitPlayer();
         if (latest != '2.2.0') _emit({..._update(), 'quiet': true});
       case 'checkUpdate':
         _later(tick, () => _emit(_update()));

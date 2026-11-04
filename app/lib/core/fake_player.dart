@@ -1,0 +1,354 @@
+import 'dart:math';
+
+import 'core.dart';
+
+const fakePlaylist = 'https://music.yandex.ru/users/ivan.petrov/playlists/1001';
+const fakeEmptyPlaylist = 'https://music.yandex.ru/users/ivan.petrov/playlists/1002';
+const fakeAlbum = 'https://music.yandex.ru/album/9';
+
+String fakeArtist(String name) => 'https://music.yandex.ru/artist/${name.hashCode.abs() % 1000}';
+
+class FakePlayer {
+  FakePlayer(this._emit, this._later);
+
+  final void Function(Event) _emit;
+  final void Function(Duration, void Function()) _later;
+
+  static const _songs = [
+    ('Звезда по имени Солнце', 'Кино', 225000),
+    ('Кукушка', 'Кино', 396000),
+    ('Группа крови', 'Кино', 286000),
+    ('Город золотой', 'Аквариум', 214000),
+    ('Ветер', 'ДДТ', 301000),
+    ('Перемен', 'Кино', 296000),
+    ('Последний герой', 'Кино', 205000),
+    ('Танец на цыпочках', 'Пикник', 247000),
+  ];
+
+  final _likes = <String>{'1', '4'};
+  final _dislikes = <String>{};
+  var _queue = <Map<String, Object?>>[];
+  var _pos = 0;
+  var _repeat = 'off';
+  var _shuffle = false;
+  var _wave = false;
+  var _loading = false;
+  var _quality = 'lossless';
+  var _volume = 0.8;
+  var _next = 100;
+  Map<String, Object?>? _source;
+  final List<String> started = [];
+  final List<String> failed = [];
+  var _failures = 0;
+  final List<String> ended = [];
+
+  Map<String, Object?> _track(int i, {String? id}) {
+    final (title, artist, ms) = _songs[i % _songs.length];
+    final tid = id ?? '${i + 1}';
+    return {
+      'id': tid,
+      'albumId': '9',
+      'title': title,
+      'artist': artist,
+      'artists': [
+        {'name': artist, 'source': fakeArtist(artist)},
+      ],
+      'album': 'Группа крови',
+      'albumSource': fakeAlbum,
+      'cover': '',
+      'durationMs': ms,
+      'explicit': i == 2,
+      'liked': _likes.contains(tid),
+      'disliked': _dislikes.contains(tid),
+      if (i == 7) 'unavailable': true,
+      'link': 'https://music.yandex.ru/album/9/track/$tid',
+    };
+  }
+
+  List<Map<String, Object?>> _list(String source) => switch (source) {
+    _ when source.contains('/track/') => [_track(0, id: source.split('/').last)],
+    'liked' => [
+      for (var i = 0; i < _songs.length; i++)
+        if (_likes.contains('${i + 1}')) _track(i),
+    ],
+    fakeEmptyPlaylist => [],
+    _ => [for (var i = 0; i < _songs.length; i++) _track(i)],
+  };
+
+  Map<String, Object?> _info(String source) => switch (source) {
+    _ when source.contains('/artist/') => {'kind': 'artist', 'id': source, 'title': _artistName(source)},
+    _ when source.contains('/album/') && !source.contains('/track/') => {
+      'kind': 'album',
+      'id': source,
+      'title': 'Группа крови',
+      'artist': 'Кино',
+      'artists': [
+        {'name': 'Кино', 'source': fakeArtist('Кино')},
+      ],
+      'year': 1988,
+    },
+    _ when source.contains('/track/') => {'kind': 'track', 'id': source, 'title': _songs[0].$1},
+    'liked' => {'kind': 'liked', 'id': 'liked', 'title': 'Мне нравится'},
+    fakeEmptyPlaylist => {'kind': 'playlist', 'id': source, 'title': 'Пустой'},
+    _ => {'kind': 'playlist', 'id': source, 'title': 'Дорога'},
+  };
+
+  String _artistName(String source) {
+    for (final (_, artist, _) in _songs) {
+      if (source.startsWith(fakeArtist(artist))) return artist;
+    }
+    return 'Кино';
+  }
+
+  Map<String, Object?>? get _current => _pos < _queue.length ? _queue[_pos] : null;
+
+  Map<String, Object?> _fresh(Map<String, Object?> t) => {
+    ...t,
+    'liked': _likes.contains(t['id']),
+    'disliked': _dislikes.contains(t['id']),
+  };
+
+  void emitPlayer([String action = '']) {
+    final cur = _current;
+    final nextPos = _repeat == 'one' ? _pos : _pos + 1;
+    final next = nextPos < _queue.length ? _queue[nextPos] : (_repeat == 'all' && _queue.isNotEmpty ? _queue[0] : null);
+    _emit({
+      'type': 'player',
+      if (action.isNotEmpty) 'action': action,
+      'track': cur == null ? null : _fresh(cur),
+      if (cur != null) 'url': 'fake://track/${cur['id']}?q=$_quality',
+      if (next != null) 'next': _fresh(next),
+      'pos': _pos,
+      'count': _queue.length,
+      'repeat': _repeat,
+      'shuffle': _shuffle,
+      'wave': _wave,
+      'loading': _loading,
+      'quality': _quality,
+      'volume': _volume,
+      'source': ?_source,
+    });
+    if (cur != null && (action == 'play' || action == 'resume')) {
+      _later(const Duration(milliseconds: 50), () {
+        _emit({
+          'type': 'playerFormat',
+          'track': cur['id'],
+          'format': _quality == 'lossless' ? 'FLAC' : (_quality == 'mp3' ? 'MP3 320' : 'MP3 192'),
+        });
+      });
+    }
+  }
+
+  void emitQueue() => _emit({
+    'type': 'queue',
+    'pos': _pos,
+    'tracks': [for (final t in _queue) _fresh(t)],
+    'source': ?_source,
+  });
+
+  void _mark(String id) => _emit({
+    'type': 'mark',
+    'track': id,
+    'liked': _likes.contains(id),
+    'disliked': _dislikes.contains(id),
+    'likedCount': _likes.length,
+  });
+
+  void _waveMore() {
+    _queue = [
+      ..._queue,
+      for (var k = 0; k < 3; k++) _track(Random(_next).nextInt(_songs.length - 1), id: '${_next++}'),
+    ];
+  }
+
+  bool handle(Map<String, Object?> c) {
+    final track = c['track'];
+    bool stale() => track != null && _current?['id'] != track;
+    switch (c['cmd']) {
+      case 'library':
+        _later(const Duration(milliseconds: 150), () {
+          _emit({
+            'type': 'library',
+            'likedCount': _likes.length,
+            'playlists': [
+              {'source': fakePlaylist, 'title': 'Дорога', 'owner': 'Иван Петров', 'count': _songs.length},
+              {'source': fakeEmptyPlaylist, 'title': 'Пустой', 'owner': 'Иван Петров', 'count': 0},
+            ],
+            'likedPlaylists': [],
+          });
+        });
+      case 'open':
+        final source = '${c['source']}';
+        _later(const Duration(milliseconds: 150), () {
+          _emit({
+            'type': 'tracks',
+            'source': source,
+            'info': _info(source),
+            'tracks': _list(source),
+            if (source.contains('/artist/') && !source.endsWith('/tracks'))
+              'albums': [
+                {'source': 'https://music.yandex.ru/album/10', 'title': 'Группа крови', 'year': 1988, 'count': 8},
+                {
+                  'source': 'https://music.yandex.ru/album/11',
+                  'title': 'Звезда по имени Солнце',
+                  'year': 1989,
+                  'count': 10,
+                  'type': 'album',
+                },
+                {
+                  'source': 'https://music.yandex.ru/album/13',
+                  'title': 'Чёрный альбом',
+                  'year': 1990,
+                  'count': 10,
+                  'type': 'album',
+                  'explicit': true,
+                },
+                {
+                  'source': 'https://music.yandex.ru/album/12',
+                  'title': 'Кукушка',
+                  'year': 1990,
+                  'count': 1,
+                  'type': 'single',
+                },
+                {
+                  'source': 'https://music.yandex.ru/album/14',
+                  'title': 'Последний герой',
+                  'year': 1989,
+                  'count': 14,
+                  'type': 'compilation',
+                },
+              ],
+          });
+        });
+      case 'play':
+        final source = '${c['source']}';
+        if (source == 'wave') {
+          _wave = true;
+          _loading = true;
+          _queue = [];
+          _pos = 0;
+          _source = {'kind': 'wave', 'id': 'wave', 'title': 'Моя волна'};
+          emitPlayer();
+          _later(const Duration(milliseconds: 200), () {
+            _loading = false;
+            _waveMore();
+            emitPlayer('play');
+            emitQueue();
+          });
+          return true;
+        }
+        _wave = false;
+        _loading = false;
+        _source = _info(source);
+        _queue = [
+          for (final t in _list(source))
+            if (t['unavailable'] != true) t,
+        ];
+        if (_queue.isEmpty) return true;
+        final i = _queue.indexWhere((t) => t['id'] == track);
+        final index = (c['index'] as int?) ?? 0;
+        _pos = i >= 0 ? i : index.clamp(0, _queue.length - 1);
+        if (_shuffle) {
+          final cur = _queue.removeAt(_pos);
+          _queue = [cur, ..._queue.reversed];
+          _pos = 0;
+        }
+        emitPlayer('play');
+        emitQueue();
+      case 'playerStarted':
+        started.add('$track');
+        _failures = 0;
+      case 'playerError':
+        if (stale()) return true;
+        failed.add('$track');
+        if (++_failures >= 3) {
+          _failures = 0;
+          _emit({'type': 'notice', 'kind': 'error', 'message': 'Не удаётся воспроизвести треки'});
+          emitPlayer('end');
+        } else if (_pos + 1 < _queue.length) {
+          _pos++;
+          emitPlayer('play');
+        } else {
+          emitPlayer('end');
+        }
+      case 'playerEnded' || 'playerNext':
+        if (stale()) return true;
+        if (c['cmd'] == 'playerEnded') ended.add('$track');
+        final auto = c['cmd'] == 'playerEnded';
+        if (auto && _repeat == 'one') {
+          emitPlayer('play');
+        } else if (_pos + 1 < _queue.length) {
+          _pos++;
+          emitPlayer('play');
+        } else if (_wave) {
+          _waveMore();
+          _pos++;
+          emitPlayer('play');
+          emitQueue();
+        } else if (_repeat == 'all') {
+          _pos = 0;
+          emitPlayer('play');
+        } else {
+          emitPlayer('end');
+        }
+        if (_wave && _queue.length - _pos < 2) {
+          _waveMore();
+          emitQueue();
+        }
+      case 'playerPrev':
+        if (stale()) return true;
+        if (((c['position'] as num?) ?? 0) <= 3 && _pos > 0) _pos--;
+        emitPlayer('play');
+      case 'playerJump':
+        final to = (c['pos'] as int?) ?? 0;
+        if (to < 0 || to >= _queue.length) return true;
+        _pos = to;
+        emitPlayer('play');
+      case 'playerRepeat':
+        _repeat = '${c['repeat']}';
+        if (_wave && _repeat == 'all') _repeat = 'off';
+        emitPlayer();
+      case 'playerShuffle':
+        _shuffle = c['on'] == true;
+        emitPlayer();
+      case 'playerQuality':
+        _quality = '${c['quality']}';
+        emitPlayer('resume');
+      case 'playerVolume':
+        _volume = ((c['volume'] as num?) ?? _volume).toDouble();
+      case 'playerState':
+        emitPlayer();
+      case 'queue':
+        emitQueue();
+      case 'like':
+        final id = '$track';
+        c['on'] == true ? _likes.add(id) : _likes.remove(id);
+        if (c['on'] == true) _dislikes.remove(id);
+        _mark(id);
+        emitPlayer();
+      case 'dislike':
+        final id = '$track';
+        c['on'] == true ? _dislikes.add(id) : _dislikes.remove(id);
+        if (c['on'] == true) _likes.remove(id);
+        _mark(id);
+        if (c['on'] == true && _current?['id'] == id) {
+          if (_pos + 1 >= _queue.length) _waveMore();
+          _pos++;
+          emitPlayer('play');
+          emitQueue();
+        } else {
+          emitPlayer();
+        }
+      case 'logout':
+        _queue = [];
+        _pos = 0;
+        _source = null;
+        _wave = false;
+        emitPlayer('stop');
+        return false;
+      default:
+        return false;
+    }
+    return true;
+  }
+}

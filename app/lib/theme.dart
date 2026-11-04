@@ -140,6 +140,8 @@ ThemeData buildTheme(Brightness brightness) {
     ),
     sliderTheme: SliderThemeData(
       showValueIndicator: ShowValueIndicator.onDrag,
+      activeTrackColor: accent,
+      thumbColor: accent,
       inactiveTrackColor: scheme.surfaceContainerHighest,
     ),
     progressIndicatorTheme: ProgressIndicatorThemeData(

@@ -1,4 +1,3 @@
-import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 
 import '../state/controller.dart';
@@ -16,10 +15,7 @@ class _SettingsDialog extends StatelessWidget {
 
   final Controller c;
 
-  Future<void> _browse() async {
-    final path = await getDirectoryPath(initialDirectory: c.dir.isEmpty ? null : c.dir);
-    if (path != null) c.setDir(path);
-  }
+  Future<void> _browse() => c.chooseDir();
 
   @override
   Widget build(BuildContext context) {
@@ -65,14 +61,12 @@ class _SettingsDialog extends StatelessWidget {
                           child: Text(c.dir, maxLines: 1, overflow: TextOverflow.ellipsis),
                         ),
                       ),
-                      if (c.desktop.canReveal) ...[
-                        IconButton(
-                          tooltip: 'Открыть',
-                          icon: const Icon(Icons.open_in_new_rounded, size: 20),
-                          onPressed: c.dir.isEmpty ? null : () => c.openFolder(c.dir),
-                        ),
-                        FilledButton.tonal(onPressed: _browse, child: const Text('Изменить')),
-                      ],
+                      IconButton(
+                        tooltip: 'Открыть папку',
+                        icon: const Icon(Icons.open_in_new_rounded, size: 20),
+                        onPressed: c.dir.isEmpty ? null : () => c.openFolder(c.dir),
+                      ),
+                      FilledButton.tonal(onPressed: _browse, child: const Text('Изменить')),
                     ],
                   ),
                 ),

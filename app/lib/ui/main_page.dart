@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -11,6 +10,9 @@ import '../theme.dart';
 import 'downloads.dart';
 import 'link_input.dart';
 import 'log_dialog.dart';
+import 'player/library_view.dart';
+import 'player/mini_player.dart';
+import 'player/now_playing.dart';
 import 'search_view.dart';
 import 'settings_dialog.dart';
 import 'source_detail.dart';
@@ -25,25 +27,31 @@ class MainPage extends StatelessWidget {
 
   void _close() => c.downloadsOpen.value = false;
 
+  void _closePlayer() => c.player.panelOpen.value = false;
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       body: SafeArea(
         child: ListenableBuilder(
-          listenable: Listenable.merge([c.drafts, c.downloadsOpen, c.search]),
+          listenable: Listenable.merge([c.drafts, c.downloadsOpen, c.search, c.section, c.player.panelOpen]),
           builder: (context, _) {
             final empty = c.drafts.value.isEmpty;
             final open = c.downloadsOpen.value;
+            final playerOpen = c.player.panelOpen.value;
             final searching = c.search.open;
+            final listen = c.section.value == Section.listen;
             return LayoutBuilder(
               builder: (context, box) {
                 final phone = box.maxWidth < phoneWidth;
                 return PopScope(
-                  canPop: !open && !searching,
+                  canPop: !open && !searching && !playerOpen,
                   onPopInvokedWithResult: (didPop, _) {
                     if (didPop) return;
-                    if (open) {
+                    if (playerOpen) {
+                      _closePlayer();
+                    } else if (open) {
                       _close();
                     } else if (searching) {
                       c.search.close();
@@ -52,16 +60,16 @@ class MainPage extends StatelessWidget {
                   child: Stack(
                     children: [
                       ExcludeFocus(
-                        excluding: open,
+                        excluding: open || playerOpen,
                         child: Column(
                           children: [
                             _Header(
                               c: c,
-                              withInput: (!empty || searching) && !phone,
+                              withInput: (!empty || searching || listen) && !phone,
                               compact: box.maxWidth < 1080,
                               phone: phone,
                             ),
-                            if (phone && (!empty || searching))
+                            if (phone && (!empty || searching || listen))
                               Padding(
                                 padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
                                 child: LinkInput(c: c),
@@ -71,6 +79,8 @@ class MainPage extends StatelessWidget {
                             Expanded(
                               child: searching
                                   ? FocusTraversalGroup(child: SearchView(c: c))
+                                  : listen
+                                  ? LibraryView(c: c, phone: phone)
                                   : empty
                                   ? _Hero(c: c)
                                   : phone
@@ -89,10 +99,21 @@ class MainPage extends StatelessWidget {
                                       ],
                                     ),
                             ),
-                            if (!empty) _ActionBar(c: c, phone: phone),
+                            if (!empty && !listen) _ActionBar(c: c, phone: phone),
+                            FocusTraversalGroup(child: MiniPlayer(p: c.player, phone: phone, onOpen: c.openPage)),
+                            if (phone) _SectionBar(c: c),
                           ],
                         ),
                       ),
+                      if (playerOpen)
+                        Positioned.fill(
+                          child: _Reveal(
+                            child: CallbackShortcuts(
+                              bindings: {const SingleActivator(LogicalKeyboardKey.escape): _closePlayer},
+                              child: FocusScope(autofocus: true, child: NowPlaying(p: c.player, phone: phone, onOpen: c.openPage)),
+                            ),
+                          ),
+                        ),
                       if (open && phone)
                         Positioned.fill(
                           child: FocusScope(autofocus: true, child: DownloadsPanel(c: c)),
@@ -124,6 +145,87 @@ class MainPage extends StatelessWidget {
           },
         ),
       ),
+    );
+  }
+}
+
+class _Reveal extends StatelessWidget {
+  const _Reveal({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final d = motion(context, const Duration(milliseconds: 280));
+    if (d == Duration.zero) return child;
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: d,
+      curve: const Cubic(0.2, 0, 0, 1),
+      child: child,
+      builder: (context, t, child) => Opacity(
+        opacity: t,
+        child: Transform.translate(offset: Offset(0, (1 - t) * 24), child: child),
+      ),
+    );
+  }
+}
+
+class _SectionBar extends StatelessWidget {
+  const _SectionBar({required this.c});
+
+  final Controller c;
+
+  @override
+  Widget build(BuildContext context) {
+    return NavigationBar(
+      height: 64,
+      selectedIndex: c.section.value.index,
+      labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+      onDestinationSelected: (i) => i == Section.listen.index ? c.listen() : c.section.value = Section.download,
+      destinations: const [
+        NavigationDestination(
+          icon: Icon(Icons.download_outlined),
+          selectedIcon: Icon(Icons.download_rounded),
+          label: 'Скачать',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.headphones_outlined),
+          selectedIcon: Icon(Icons.headphones_rounded),
+          label: 'Слушать',
+        ),
+      ],
+    );
+  }
+}
+
+class _SectionSwitch extends StatelessWidget {
+  const _SectionSwitch({required this.c, required this.compact});
+
+  final Controller c;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    return SegmentedButton<Section>(
+      showSelectedIcon: false,
+      style: const ButtonStyle(visualDensity: VisualDensity.compact),
+      segments: [
+        ButtonSegment(
+          value: Section.download,
+          icon: const Icon(Icons.download_rounded, size: 18),
+          label: compact ? null : const Text('Скачать'),
+          tooltip: compact ? 'Скачать' : null,
+        ),
+        ButtonSegment(
+          value: Section.listen,
+          icon: const Icon(Icons.headphones_rounded, size: 18),
+          label: compact ? null : const Text('Слушать'),
+          tooltip: compact ? 'Слушать' : null,
+        ),
+      ],
+      selected: {c.section.value},
+      onSelectionChanged: (s) => s.first == Section.listen ? c.listen() : c.section.value = Section.download,
     );
   }
 }
@@ -376,7 +478,9 @@ class _Header extends StatelessWidget {
               const SizedBox(width: 10),
               Text('YAMD', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
             ],
-            SizedBox(width: compact ? 16 : 24),
+            SizedBox(width: compact ? 12 : 20),
+            ListenableBuilder(listenable: c.section, builder: (context, _) => _SectionSwitch(c: c, compact: compact)),
+            SizedBox(width: compact ? 12 : 20),
             Expanded(
               child: withInput
                   ? Align(
@@ -428,7 +532,7 @@ class _Hero extends StatelessWidget {
           decoration: BoxDecoration(color: context.status.accent, shape: BoxShape.circle),
         ),
         const SizedBox(width: 8),
-        Text(text, style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 13)),
+        Flexible(child: Text(text, style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 13))),
       ],
     );
     final phone = MediaQuery.sizeOf(context).width < phoneWidth;
@@ -486,10 +590,7 @@ class _ActionBar extends StatelessWidget {
   final Controller c;
   final bool phone;
 
-  Future<void> _browse() async {
-    final path = await getDirectoryPath(initialDirectory: c.dir.isEmpty ? null : c.dir);
-    if (path != null) c.setDir(path);
-  }
+  Future<void> _browse() => c.chooseDir();
 
   @override
   Widget build(BuildContext context) {

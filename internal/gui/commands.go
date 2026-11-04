@@ -6,23 +6,34 @@ import (
 	"regexp"
 	"strings"
 
+	"ymd/internal/player"
 	"ymd/internal/yam"
 )
 
 type uiCommand struct {
-	Cmd         string `json:"cmd"`
-	Token       string `json:"token"`
-	Link        string `json:"link"`
-	Dir         string `json:"dir"`
-	Theme       string `json:"theme"`
-	Quality     string `json:"quality"`
-	Concurrency int    `json:"concurrency"`
-	ID          int    `json:"id"`
-	Album       string `json:"album"`
-	Query       string `json:"query"`
-	Kind        string `json:"kind"`
-	Page        int    `json:"page"`
-	Seq         int    `json:"seq"`
+	Cmd         string   `json:"cmd"`
+	Token       string   `json:"token"`
+	Link        string   `json:"link"`
+	Dir         string   `json:"dir"`
+	Theme       string   `json:"theme"`
+	Quality     string   `json:"quality"`
+	Concurrency int      `json:"concurrency"`
+	ID          int      `json:"id"`
+	Album       string   `json:"album"`
+	Query       string   `json:"query"`
+	Kind        string   `json:"kind"`
+	Page        int      `json:"page"`
+	Seq         int      `json:"seq"`
+	Source      string   `json:"source"`
+	Track       string   `json:"track"`
+	Index       int      `json:"index"`
+	Pos         int      `json:"pos"`
+	Position    float64  `json:"position"`
+	On          bool     `json:"on"`
+	Repeat      string   `json:"repeat"`
+	Volume      float64  `json:"volume"`
+	Seeds       []string `json:"seeds"`
+	Message     string   `json:"message"`
 	Select      []struct {
 		Album  string   `json:"album"`
 		Tracks []string `json:"tracks"`
@@ -42,6 +53,7 @@ func (g *App) onMessage(message string) {
 		g.mu.Unlock()
 		g.emit(acc)
 		g.jobs.emitAll()
+		g.emitPlayer("")
 		g.onReady()
 	case "checkUpdate":
 		g.checkUpdate(false)
@@ -79,6 +91,40 @@ func (g *App) onMessage(message string) {
 		g.albumTracks(c.Album)
 	case "search":
 		g.search(c.Seq, strings.TrimSpace(c.Query), c.Kind, c.Page)
+	case "library":
+		g.library()
+	case "open":
+		g.openSource(strings.TrimSpace(c.Source))
+	case "play":
+		g.play(strings.TrimSpace(c.Source), c.Track, c.Index, c.Seeds)
+	case "playerNext":
+		g.move(c.Track, c.Position, false, func(q *player.Queue) bool { return q.Next(false) })
+	case "playerEnded":
+		g.move(c.Track, c.Position, true, func(q *player.Queue) bool { return q.Next(true) })
+	case "playerPrev":
+		g.playerPrev(c.Track, c.Position)
+	case "playerJump":
+		g.move("", c.Position, false, func(q *player.Queue) bool { return q.Jump(c.Pos) })
+	case "playerStarted":
+		g.playerStarted(c.Track)
+	case "playerError":
+		g.playerFailed(c.Track, c.Message)
+	case "playerQuality":
+		g.setPlayerQuality(c.Quality)
+	case "playerVolume":
+		g.setVolume(c.Volume)
+	case "playerRepeat":
+		g.setRepeat(c.Repeat)
+	case "playerShuffle":
+		g.setShuffle(c.On)
+	case "playerState":
+		g.emitPlayer("")
+	case "queue":
+		g.emitQueue()
+	case "like":
+		g.mark(c.Track, c.On, false, c.Position)
+	case "dislike":
+		g.mark(c.Track, c.On, true, c.Position)
 	case "cancel":
 		g.jobs.cancel(c.ID)
 	case "retry":
