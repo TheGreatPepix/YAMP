@@ -494,22 +494,34 @@ List<Widget> pageItems(PlayTrack t, OpenPage onOpen, {String here = ''}) => [
       ),
 ];
 
+const waveByTrack = 'Моя волна по треку';
+
 class TrackMenu extends StatelessWidget {
-  const TrackMenu({super.key, required this.track, required this.onOpen, this.onDownload, this.size});
+  const TrackMenu({super.key, required this.track, required this.onOpen, this.onDownload, this.onWave, this.size});
 
   final PlayTrack track;
   final OpenPage onOpen;
   final Download? onDownload;
+  final VoidCallback? onWave;
   final double? size;
 
   @override
   Widget build(BuildContext context) {
     final pages = pageItems(track, onOpen);
     final downloads = onDownload == null ? const <Widget>[] : downloadItems(onDownload!, track.link, track.title);
-    if (pages.isEmpty && downloads.isEmpty) return const SizedBox.shrink();
+    final wave = onWave;
+    if (pages.isEmpty && downloads.isEmpty && wave == null) return const SizedBox.shrink();
     final box = size;
     return MenuAnchor(
-      menuChildren: [...downloads, if (downloads.isNotEmpty && pages.isNotEmpty) const Divider(height: 8), ...pages],
+      menuChildren: [
+        if (wave != null) ...[
+          MenuItemButton(leadingIcon: const Icon(Icons.waves_rounded), onPressed: wave, child: const Text(waveByTrack)),
+          if (downloads.isNotEmpty || pages.isNotEmpty) const Divider(height: 8),
+        ],
+        ...downloads,
+        if (downloads.isNotEmpty && pages.isNotEmpty) const Divider(height: 8),
+        ...pages,
+      ],
       builder: (context, menu, _) => IconButton(
         tooltip: 'Ещё',
         onPressed: () => menu.isOpen ? menu.close() : menu.open(),

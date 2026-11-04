@@ -25,6 +25,9 @@ const (
 	waveQueueKeep = 100
 	listTTL       = 2 * time.Minute
 	listKeep      = 8
+	retryFirst    = 2 * time.Second
+	retryMax      = 15 * time.Second
+	probeTimeout  = 15 * time.Second
 )
 
 const (
@@ -32,6 +35,7 @@ const (
 	actResume = "resume"
 	actStop   = "stop"
 	actEnd    = "end"
+	actRetry  = "retry"
 )
 
 type playSource struct {
@@ -112,6 +116,8 @@ type playerEvent struct {
 	Shuffle bool        `json:"shuffle"`
 	Wave    bool        `json:"wave"`
 	Loading bool        `json:"loading,omitempty"`
+	Offline bool        `json:"offline,omitempty"`
+	Start   float64     `json:"start,omitempty"`
 	Quality string      `json:"quality"`
 	Volume  float64     `json:"volume"`
 	Source  *playSource `json:"source,omitempty"`
@@ -161,6 +167,8 @@ type playerState struct {
 
 	lists    map[string]*trackList
 	failures int
+	offline  bool
+	resumeAt float64
 
 	reports serial
 }
@@ -264,7 +272,7 @@ func (g *App) playerReset() {
 	p.mu.Lock()
 	p.seq++
 	p.queue.Clear()
-	p.source, p.wave = nil, nil
+	p.source, p.wave, p.offline = nil, nil, false
 	p.likesFor, p.liked = nil, nil
 	p.likes, p.dislikes = map[string]bool{}, map[string]bool{}
 	p.lists = map[string]*trackList{}
@@ -477,7 +485,7 @@ func (g *App) play(source, trackID string, index int, seeds []string) {
 		source = sourceWave
 	}
 	if source == sourceWave {
-		g.startWave(sess, seeds)
+		g.startWave(sess, waveStart{seeds: seeds})
 		return
 	}
 	g.mu.Lock()
@@ -516,7 +524,7 @@ func (g *App) play(source, trackID string, index int, seeds []string) {
 			return
 		}
 		src := list.Source
-		p.source, p.wave, p.failures = &src, nil, 0
+		p.source, p.wave, p.failures, p.offline = &src, nil, 0, false
 		p.queue.SetRepeat(repeat)
 		p.queue.SetShuffle(shuffle)
 		p.queue.Set(tracks, start)
@@ -533,7 +541,63 @@ func waveRepeat(r player.Repeat) player.Repeat {
 	return r
 }
 
-func (g *App) startWave(sess *yam.Session, seeds []string) {
+type waveStart struct {
+	seeds    []string
+	fallback []string
+	title    string
+	played   []yam.Track
+}
+
+func waveSeeds(source, trackID string) (seeds, fallback []string) {
+	if trackID != "" {
+		fallback = []string{"track:" + trackID}
+	}
+	if l, err := yam.ParseLink(source); err == nil {
+		switch l.Kind {
+		case yam.KindAlbum:
+			seeds = []string{"album:" + l.AlbumID}
+		case yam.KindArtist:
+			seeds = []string{"artist:" + l.ArtistID}
+		case yam.KindPlaylist:
+			if l.Owner != "" && l.PlaylistKind != "" {
+				seeds = []string{"playlist:" + l.Owner + "_" + l.PlaylistKind}
+			}
+		case yam.KindTrack:
+			seeds = []string{"track:" + l.TrackID}
+		}
+	}
+	if len(seeds) == 0 {
+		seeds, fallback = fallback, nil
+	}
+	return seeds, fallback
+}
+
+func (g *App) waveFrom(source, trackID, title string) {
+	sess := g.needSession()
+	if sess == nil {
+		return
+	}
+	seeds, fallback := waveSeeds(source, trackID)
+	if len(seeds) == 0 {
+		g.notice("По этому нельзя запустить волну", "error")
+		return
+	}
+	if title != "" {
+		title = "Моя волна: " + title
+	}
+	g.startWave(sess, waveStart{seeds: seeds, fallback: fallback, title: title})
+}
+
+func (g *App) startWave(sess *yam.Session, start waveStart) {
+	seeds := start.seeds
+	title := start.title
+	if title == "" {
+		title = "Моя волна"
+	}
+	played := start.played
+	if len(played) > waveQueueKeep {
+		played = played[len(played)-waveQueueKeep:]
+	}
 	g.mu.Lock()
 	repeat := waveRepeat(player.ParseRepeat(g.cfg.Repeat))
 	g.mu.Unlock()
@@ -544,9 +608,9 @@ func (g *App) startWave(sess *yam.Session, seeds []string) {
 	p.queue.SetRepeat(repeat)
 	p.queue.SetShuffle(false)
 	p.queue.Clear()
-	p.source = &playSource{Kind: sourceWave, ID: sourceWave, Title: "Моя волна"}
+	p.source = &playSource{Kind: sourceWave, ID: sourceWave, Title: title}
 	p.wave = &waveState{seeds: seeds, batches: map[string]string{}, loading: true, pending: true}
-	p.failures = 0
+	p.failures, p.offline = 0, false
 	p.mu.Unlock()
 	g.emitPlayer("")
 
@@ -556,9 +620,17 @@ func (g *App) startWave(sess *yam.Session, seeds []string) {
 		if err := g.ensureLikes(ctx, sess); err != nil {
 			g.logf("Лайки: %v", err)
 		}
-		batch, err := sess.WaveStart(ctx, seeds, nil)
+		batch, err := sess.WaveStart(ctx, seeds, played)
 		if err == nil && len(batch.Tracks) == 0 {
 			err = errors.New("Яндекс не прислал треков")
+		}
+		if err != nil && len(start.fallback) > 0 {
+			g.logf("Моя волна по %v: %v", seeds, err)
+			seeds = start.fallback
+			batch, err = sess.WaveStart(ctx, seeds, played)
+			if err == nil && len(batch.Tracks) == 0 {
+				err = errors.New("Яндекс не прислал треков")
+			}
 		}
 		p.mu.Lock()
 		if seq != p.seq || p.wave == nil {
@@ -574,9 +646,22 @@ func (g *App) startWave(sess *yam.Session, seeds []string) {
 			g.emitPlayer(actStop)
 			return
 		}
-		w.session, w.pending = batch.Session, false
+		w.session, w.pending, w.seeds = batch.Session, false, seeds
 		g.addBatch(batch)
-		p.queue.Set(batch.Tracks, 0)
+		seen := map[string]bool{}
+		for _, t := range played {
+			seen[t.ID] = true
+		}
+		var fresh []yam.Track
+		for _, t := range batch.Tracks {
+			if !seen[t.ID] && !p.dislikes[t.ID] {
+				fresh = append(fresh, t)
+			}
+		}
+		if len(fresh) == 0 {
+			fresh = batch.Tracks
+		}
+		p.queue.Set(fresh, 0)
 		p.mu.Unlock()
 		p.reports.run(func() { g.waveFeedback(sess, batch.Session, batch.Batch, yam.WaveStarted, "", 0) })
 		g.emitPlayer(actPlay)
@@ -691,7 +776,15 @@ func (g *App) reportPlay(sess *yam.Session, t yam.Track, wave *waveState, played
 	}
 }
 
+func (g *App) forward(trackID string, played float64, ended bool) {
+	g.moveOn(trackID, played, ended, true, func(q *player.Queue) bool { return q.Next(ended) })
+}
+
 func (g *App) move(trackID string, played float64, ended bool, step func(q *player.Queue) bool) {
+	g.moveOn(trackID, played, ended, false, step)
+}
+
+func (g *App) moveOn(trackID string, played float64, ended, onward bool, step func(q *player.Queue) bool) {
 	sess := g.playerSession()
 	p := g.player
 	p.mu.Lock()
@@ -705,10 +798,15 @@ func (g *App) move(trackID string, played float64, ended bool, step func(q *play
 	if w != nil {
 		snapshot = &waveState{session: w.session, batches: map[string]string{cur.ID: w.batches[cur.ID]}}
 	}
+	p.offline = false
 	moved := step(&p.queue)
 	waiting := !moved && w != nil
 	if waiting {
 		w.pending = true
+	}
+	var history []yam.Track
+	if !moved && w == nil && onward && ok {
+		history = p.queue.Played()
 	}
 	p.mu.Unlock()
 
@@ -723,6 +821,8 @@ func (g *App) move(trackID string, played float64, ended bool, step func(q *play
 		g.emitPlayer(actPlay)
 	case waiting:
 		g.emitPlayer("")
+	case history != nil && sess != nil:
+		g.startWave(sess, waveStart{seeds: []string{"track:" + cur.ID}, played: history})
 	default:
 		g.emitPlayer(actEnd)
 	}
@@ -762,28 +862,99 @@ func (g *App) playerStarted(trackID string) {
 	}
 }
 
-func (g *App) playerFailed(trackID, message string) {
+func (g *App) playerFailed(trackID, message string, position float64) {
 	p := g.player
 	p.mu.Lock()
 	cur, ok := p.queue.Current()
-	if !ok || cur.ID != trackID {
+	if !ok || cur.ID != trackID || p.offline {
 		p.mu.Unlock()
 		return
 	}
+	seq, pos := p.seq, p.queue.Pos()
 	p.failures++
 	failures := p.failures
 	p.mu.Unlock()
 	g.logf("Плеер: %s - %s: %s", cur.Artists, cur.Title, message)
-	if failures >= maxFailures {
+
+	go func() {
+		offline := g.offline(trackID)
 		p.mu.Lock()
-		p.failures = 0
+		now, ok := p.queue.Current()
+		if seq != p.seq || pos != p.queue.Pos() || !ok || now.ID != trackID || p.offline {
+			p.mu.Unlock()
+			return
+		}
+		if offline {
+			p.offline, p.failures = true, 0
+			p.mu.Unlock()
+			g.logf("Плеер: нет связи, жду сеть")
+			g.emitPlayer("")
+			g.waitOnline(seq, pos, trackID, position)
+			return
+		}
 		p.mu.Unlock()
-		g.notice("Не удаётся воспроизвести треки. Проверьте подключение или смените качество", "error")
-		g.emitPlayer(actEnd)
+		switch {
+		case failures < maxFailures && position > 0:
+			g.retryAt(position)
+		case position > 0:
+			g.forward(trackID, position, false)
+		case failures >= maxFailures:
+			p.mu.Lock()
+			p.failures = 0
+			p.mu.Unlock()
+			g.notice("Не удаётся воспроизвести треки. Проверьте подключение или смените качество", "error")
+			g.emitPlayer(actEnd)
+		default:
+			g.notice("Не удалось воспроизвести «"+cur.Title+"», включаю следующий", "error")
+			g.forward(trackID, 0, false)
+		}
+	}()
+}
+
+func (g *App) offline(trackID string) bool {
+	g.mu.Lock()
+	q := playQuality(g.cfg.PlayQuality)
+	g.mu.Unlock()
+	ctx, cancel := context.WithTimeout(context.Background(), probeTimeout)
+	defer cancel()
+	return yam.Offline(g.stream.streamer.Check(ctx, trackID, q))
+}
+
+func (g *App) waitOnline(seq, pos int, trackID string, position float64) {
+	p := g.player
+	waiting := func() bool {
+		p.mu.Lock()
+		defer p.mu.Unlock()
+		cur, ok := p.queue.Current()
+		return p.offline && seq == p.seq && pos == p.queue.Pos() && ok && cur.ID == trackID
+	}
+	delay := retryFirst
+	for {
+		time.Sleep(delay)
+		delay = min(delay*2, retryMax)
+		if !waiting() {
+			return
+		}
+		if !g.offline(trackID) {
+			break
+		}
+	}
+	if !waiting() {
 		return
 	}
-	g.notice("Не удалось воспроизвести «"+cur.Title+"», включаю следующий", "error")
-	g.move(trackID, 0, false, func(q *player.Queue) bool { return q.Next(false) })
+	g.logf("Плеер: сеть вернулась")
+	p.mu.Lock()
+	p.offline = false
+	p.mu.Unlock()
+	g.retryAt(position)
+}
+
+func (g *App) retryAt(position float64) {
+	p := g.player
+	p.mu.Lock()
+	p.resumeAt = max(position, 0)
+	p.mu.Unlock()
+	g.emitPlayer(actRetry)
 }
 
 func (g *App) setPlayerQuality(q string) {
@@ -874,7 +1045,7 @@ func (g *App) mark(trackID string, on, dislike bool, position float64) {
 	p.mu.Unlock()
 	g.emitMark(trackID)
 	if skip {
-		g.move(trackID, position, false, func(q *player.Queue) bool { return q.Next(false) })
+		g.forward(trackID, position, false)
 	} else {
 		g.emitPlayer("")
 	}
@@ -934,7 +1105,10 @@ func (g *App) emitPlayer(action string) {
 	ev := playerEvent{
 		Type: "player", Action: action, Pos: p.queue.Pos(), Count: p.queue.Len(),
 		Repeat: string(p.queue.Repeat()), Shuffle: p.queue.Shuffle(), Quality: string(q), Volume: vol,
-		Wave: p.wave != nil, Loading: p.wave != nil && p.wave.pending,
+		Wave: p.wave != nil, Loading: p.offline || (p.wave != nil && p.wave.pending), Offline: p.offline,
+	}
+	if action == actRetry {
+		ev.Start = p.resumeAt
 	}
 	if p.source != nil {
 		src := *p.source
@@ -954,7 +1128,7 @@ func (g *App) emitPlayer(action string) {
 	p.mu.Unlock()
 
 	if ev.Track == nil {
-		if action == actPlay || action == actResume {
+		if action == actPlay || action == actResume || action == actRetry {
 			ev.Action = actStop
 		}
 		g.emit(ev)
@@ -969,7 +1143,7 @@ func (g *App) emitPlayer(action string) {
 		ev.NextURL, _ = g.stream.url(next.ID, q)
 	}
 	g.emit(ev)
-	if action == actPlay || action == actResume {
+	if action == actPlay || action == actResume || action == actRetry {
 		go g.prepare(cur.ID, q, true)
 		if hasNext {
 			go g.prepare(next.ID, q, false)

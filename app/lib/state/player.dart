@@ -256,6 +256,7 @@ class PlayerState extends ChangeNotifier {
   var shuffle = false;
   var wave = false;
   var loading = false;
+  var offline = false;
   var quality = PlayQuality.lossless;
   var volume = 0.8;
   PlaySource? source;
@@ -304,6 +305,7 @@ class PlayerState extends ChangeNotifier {
   var likedCount = 0;
 
   String? _startedFor;
+  String? _announced;
   String? _failedFor;
   var _openedAt = Duration.zero;
   var _volumeApplied = false;
@@ -400,6 +402,7 @@ class PlayerState extends ChangeNotifier {
     shuffle = ev['shuffle'] == true;
     wave = ev['wave'] == true;
     loading = ev['loading'] == true;
+    offline = ev['offline'] == true;
     quality = PlayQuality.values.asNameMap()[_s(ev['quality'])] ?? PlayQuality.lossless;
     volume = (ev['volume'] as num?)?.toDouble() ?? volume;
     final s = ev['source'];
@@ -414,6 +417,7 @@ class PlayerState extends ChangeNotifier {
     switch (ev['action']) {
       case 'play' when current != null:
         _startedFor = null;
+        _announced = null;
         _failedFor = null;
         _openedAt = Duration.zero;
         position.value = Duration.zero;
@@ -423,8 +427,16 @@ class PlayerState extends ChangeNotifier {
         _failedFor = null;
         _openedAt = position.value;
         engine.open(url, start: position.value, play: playing, hint: current.duration);
+      case 'retry' when current != null:
+        final at = Duration(milliseconds: (((ev['start'] as num?) ?? 0) * 1000).round());
+        _startedFor = null;
+        _failedFor = null;
+        _openedAt = at;
+        position.value = at;
+        engine.open(url, start: at, hint: current.duration);
       case 'stop':
         _startedFor = null;
+        _announced = null;
         position.value = Duration.zero;
         duration.value = Duration.zero;
         engine.stop();
@@ -446,15 +458,25 @@ class PlayerState extends ChangeNotifier {
     if (id == null || _startedFor == id) return;
     if (p > _openedAt && p < _openedAt + const Duration(seconds: 3)) {
       _startedFor = id;
+      if (_announced == id) return;
+      _announced = id;
       _send({'cmd': 'playerStarted', 'track': id});
     }
   }
+
+  static const _cutSlack = Duration(seconds: 5);
 
   double get _seconds => position.value.inMilliseconds / 1000;
 
   void _onCompleted() {
     final id = track?.id;
-    if (id == null) return;
+    if (id == null || _failedFor == id) return;
+    final total = duration.value;
+    if (_startedFor == id && total > _cutSlack * 2 && position.value < total - _cutSlack) {
+      _failedFor = id;
+      _send({'cmd': 'playerError', 'track': id, 'message': 'поток оборвался', 'position': _seconds});
+      return;
+    }
     final played = duration.value > Duration.zero ? duration.value : position.value;
     _startedFor = null;
     _send({'cmd': 'playerEnded', 'track': id, 'position': played.inMilliseconds / 1000});
@@ -464,7 +486,7 @@ class PlayerState extends ChangeNotifier {
     final id = track?.id;
     if (id == null || _startedFor == id || _failedFor == id) return;
     _failedFor = id;
-    _send({'cmd': 'playerError', 'track': id, 'message': message});
+    _send({'cmd': 'playerError', 'track': id, 'message': message, 'position': _seconds});
   }
 
   void Function(String message)? onBlocked;
@@ -562,6 +584,16 @@ class PlayerState extends ChangeNotifier {
     if (_blocked()) return;
     if (!shuffle) _send({'cmd': 'playerShuffle', 'on': true});
     _send({'cmd': 'play', 'source': source, 'index': -1});
+  }
+
+  void playWave({String source = '', PlayTrack? track, String title = ''}) {
+    if (_blocked()) return;
+    _send({
+      'cmd': 'wave',
+      if (source.isNotEmpty) 'source': source,
+      'track': ?track?.id,
+      'title': title.isNotEmpty ? title : (track?.title ?? ''),
+    });
   }
 
   void jump(int index) => _send({'cmd': 'playerJump', 'pos': index, 'position': _seconds});

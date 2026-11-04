@@ -88,7 +88,7 @@ void main() {
     expect(c.player.liked(c.player.track!), isTrue);
     expect(_tip('Убрать из «Мне нравится»'), findsWidgets);
 
-    engine.finish();
+    engine.progress(first.duration);
     await _settle(tester);
     expect(core.player.ended, [first.id]);
     expect(c.player.track!.id, isNot(first.id));
@@ -199,6 +199,45 @@ void main() {
     await core.close();
   });
 
+  test('оборванный поток не перескакивает, а продолжается с того же места', () {
+    final sent = <Map<String, Object?>>[];
+    final engine = SilentEngine();
+    final p = PlayerState(sent.add, engine);
+    Map<String, Object?> ev(String action, {double? start, bool offline = false}) => {
+      'type': 'player',
+      'action': action,
+      'url': 'http://127.0.0.1/1',
+      'start': ?start,
+      'offline': offline,
+      'loading': offline,
+      'track': {'id': '1', 'title': 'Песня', 'durationMs': 180000},
+    };
+
+    p.receive(ev('play'));
+    engine.progress(const Duration(seconds: 1));
+    expect(sent.where((c) => c['cmd'] == 'playerStarted'), hasLength(1));
+    engine.progress(const Duration(seconds: 60));
+    engine.finish();
+    expect(sent.last, containsPair('cmd', 'playerError'));
+    expect(sent.last, containsPair('position', 61.0));
+    expect(sent.where((c) => c['cmd'] == 'playerEnded'), isEmpty);
+
+    p.receive(ev('', offline: true));
+    expect(p.offline, isTrue);
+    expect(p.loading, isTrue);
+
+    p.receive(ev('retry', start: 61));
+    expect(engine.at, const Duration(seconds: 61));
+    expect(engine.isPlaying, isTrue);
+    expect(p.offline, isFalse);
+    engine.progress(const Duration(seconds: 1));
+    expect(sent.where((c) => c['cmd'] == 'playerStarted'), hasLength(1));
+
+    engine.progress(const Duration(seconds: 117));
+    engine.finish();
+    expect(sent.last, containsPair('cmd', 'playerEnded'));
+  });
+
   test('дни истории подписаны по-русски', () {
     final now = DateTime(2026, 11, 4, 0, 30);
     expect(dayLabel('2026-11-04', now), 'Сегодня');
@@ -270,6 +309,25 @@ void main() {
     await _settle(tester);
     expect(c.player.browsing.value, isFalse);
     expect(find.text('Вся история'), findsOneWidget);
+    await core.close();
+  });
+
+  testWidgets('волна по плейлисту и по треку из меню', (tester) async {
+    final (core, c, _) = await _open(tester);
+    await tester.tap(find.text('Дорога'));
+    await _settle(tester);
+    await tester.tap(find.text('Волна по плейлисту'));
+    await _settle(tester);
+    expect(c.player.wave, isTrue);
+    expect(c.player.source?.title, 'Моя волна: Дорога');
+    expect(core.player.waves.single, contains('playlists'));
+
+    await tester.tap(_tip('Ещё').last);
+    await _settle(tester);
+    await tester.tap(find.text('Моя волна по треку'));
+    await _settle(tester);
+    expect(core.player.waves, hasLength(2));
+    expect(c.player.source?.title, startsWith('Моя волна: '));
     await core.close();
   });
 

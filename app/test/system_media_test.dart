@@ -110,6 +110,27 @@ void main() {
     expect(engine.isPlaying, isFalse);
   });
 
+  test('лайк и дизлайк из уведомления', () async {
+    player.receive(_player('play'));
+    await Future<void>.delayed(Duration.zero);
+    expect(last(), containsPair('liked', false));
+
+    await command('like');
+    expect(sent.last, containsPair('cmd', 'like'));
+    expect(sent.last, containsPair('on', true));
+
+    player.receive({'type': 'mark', 'track': '1', 'liked': true, 'disliked': false, 'likedCount': 1});
+    await Future<void>.delayed(Duration.zero);
+    expect(last(), containsPair('liked', true));
+
+    await command('like');
+    expect(sent.last, containsPair('on', false));
+
+    await command('dislike');
+    expect(sent.last, containsPair('cmd', 'dislike'));
+    expect(sent.last, containsPair('on', true));
+  });
+
   test('без libmpv плеер не запускается и объясняет почему', () {
     final blocked = <String>[];
     final p = PlayerState(sent.add, UnavailableEngine('нет libmpv'))..onBlocked = blocked.add;

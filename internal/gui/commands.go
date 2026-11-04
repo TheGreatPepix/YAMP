@@ -105,10 +105,12 @@ func (g *App) onMessage(message string) {
 		g.openSource(strings.TrimSpace(c.Source))
 	case "play":
 		g.play(strings.TrimSpace(c.Source), c.Track, c.Index, c.Seeds)
+	case "wave":
+		g.waveFrom(strings.TrimSpace(c.Source), c.Track, c.Title)
 	case "playerNext":
-		g.move(c.Track, c.Position, false, func(q *player.Queue) bool { return q.Next(false) })
+		g.forward(c.Track, c.Position, false)
 	case "playerEnded":
-		g.move(c.Track, c.Position, true, func(q *player.Queue) bool { return q.Next(true) })
+		g.forward(c.Track, c.Position, true)
 	case "playerPrev":
 		g.playerPrev(c.Track, c.Position)
 	case "playerJump":
@@ -116,7 +118,7 @@ func (g *App) onMessage(message string) {
 	case "playerStarted":
 		g.playerStarted(c.Track)
 	case "playerError":
-		g.playerFailed(c.Track, c.Message)
+		g.playerFailed(c.Track, c.Message, c.Position)
 	case "playerQuality":
 		g.setPlayerQuality(c.Quality)
 	case "playerVolume":

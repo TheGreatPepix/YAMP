@@ -529,6 +529,7 @@ class ListHeader extends StatelessWidget {
     final playable = list.tracks.where((t) => !t.unavailable).length;
     final top = isTopTracks(source);
     final artist = kind == 'artist' && !top;
+    final waveable = const {'album', 'artist', 'playlist', 'track'}.contains(kind) && !liked && playable > 0;
     final over = switch (kind) {
       sourceLiked => 'Коллекция',
       sourceChart => 'Чарт',
@@ -655,6 +656,21 @@ class ListHeader extends StatelessWidget {
                 icon: const Icon(Icons.shuffle_rounded, size: 18),
                 label: const Text('Вперемешку'),
               ),
+              if (waveable)
+                OutlinedButton.icon(
+                  onPressed: () => p.playWave(
+                    source: artistOfTop(source),
+                    track: list.tracks.where((t) => !t.unavailable).firstOrNull,
+                    title: title,
+                  ),
+                  icon: const Icon(Icons.waves_rounded, size: 18),
+                  label: Text(switch (kind) {
+                    'album' => 'Волна по альбому',
+                    'artist' => 'Волна по исполнителю',
+                    'track' => 'Волна по треку',
+                    _ => 'Волна по плейлисту',
+                  }),
+                ),
               if (!top && kind != sourceHistory)
                 DownloadButton(
                   download: (link, q, name) => c.download(link, q, title: name),
@@ -802,6 +818,12 @@ class _More extends StatelessWidget {
             leadingIcon: Icon(p.liked(track) ? Icons.favorite_rounded : Icons.favorite_border_rounded),
             onPressed: () => p.like(track, !p.liked(track)),
             child: Text(p.liked(track) ? 'Убрать из «Мне нравится»' : 'Мне нравится'),
+          ),
+        if (!track.unavailable)
+          MenuItemButton(
+            leadingIcon: const Icon(Icons.waves_rounded),
+            onPressed: () => p.playWave(track: track),
+            child: const Text(waveByTrack),
           ),
         if (!track.unavailable) ...[
           ...downloadItems((link, q, name) => c.download(link, q, title: name), track.link, track.title),

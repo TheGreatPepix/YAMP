@@ -13,6 +13,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -25,11 +26,14 @@ type fakeMusic struct {
 	plain []byte
 	enc   []byte
 
+	offline atomic.Bool
+
 	mu       sync.Mutex
 	feedback []string
 	plays    []string
 	likes    []string
 	waveCall int
+	seeds    []string
 }
 
 func newFakeMusic(t *testing.T) *fakeMusic {
@@ -41,6 +45,12 @@ func newFakeMusic(t *testing.T) *fakeMusic {
 		return `{"id":"` + id + `","title":"T` + id + `","durationMs":200000,"artists":[{"name":"A"}],"albums":[{"id":9,"title":"Al"}]}`
 	}
 	f.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if f.offline.Load() {
+			if conn, _, err := w.(http.Hijacker).Hijack(); err == nil {
+				conn.Close()
+			}
+			return
+		}
 		f.mu.Lock()
 		defer f.mu.Unlock()
 		r.ParseForm()
@@ -55,6 +65,16 @@ func newFakeMusic(t *testing.T) *fakeMusic {
 			f.likes = append(f.likes, strings.TrimPrefix(r.URL.Path, "/users/5/")+"="+r.PostForm.Get("track-ids"))
 			w.Write([]byte(`{"result":{"revision":1}}`))
 		case "/rotor/session/new":
+			var body struct {
+				Seeds []string `json:"seeds"`
+				Queue []string `json:"queue"`
+			}
+			json.NewDecoder(r.Body).Decode(&body)
+			f.seeds = append(f.seeds, strings.Join(body.Seeds, ",")+"|"+strings.Join(body.Queue, ","))
+			if len(body.Seeds) == 1 && strings.HasPrefix(body.Seeds[0], "playlist:") {
+				http.Error(w, "bad seed", http.StatusBadRequest)
+				return
+			}
 			w.Write([]byte(`{"result":{"radioSessionId":"S","batchId":"B1","sequence":[{"type":"track","track":` + track("1") + `},{"type":"track","track":` + track("2") + `}]}}`))
 		case "/rotor/session/S/tracks":
 			f.waveCall++
@@ -441,5 +461,79 @@ func TestPlayerHistory(t *testing.T) {
 	played := log.wait(t, "player", playing("21", "play"))
 	if played["pos"] != float64(2) {
 		t.Errorf("начали с позиции %v, ждали 2", played["pos"])
+	}
+}
+
+func TestPlayerWaitsForNetwork(t *testing.T) {
+	c, f, log := startPlayerCore(t)
+	link := "https://music.yandex.ru/users/me/playlists/1001"
+
+	send(c, map[string]any{"cmd": "play", "source": link, "track": "21"})
+	log.wait(t, "player", playing("21", "play"))
+	send(c, map[string]any{"cmd": "playerStarted", "track": "21"})
+
+	send(c, map[string]any{"cmd": "playerError", "track": "21", "message": "tcp: timeout", "position": 42.5})
+	ev := log.wait(t, "player", playing("21", "retry"))
+	if ev["start"] != 42.5 {
+		t.Errorf("продолжение с %v", ev["start"])
+	}
+
+	f.offline.Store(true)
+	send(c, map[string]any{"cmd": "playerError", "track": "21", "message": "tcp: timeout", "position": 0})
+	ev = log.wait(t, "player", func(ev map[string]any) bool { return ev["offline"] == true })
+	if tr := ev["track"].(map[string]any); tr["id"] != "21" || ev["loading"] != true {
+		t.Errorf("ожидание сети = %v", ev)
+	}
+	send(c, map[string]any{"cmd": "playerError", "track": "21", "message": "again", "position": 0})
+	f.offline.Store(false)
+	ev = log.wait(t, "player", playing("21", "retry"))
+	if ev["offline"] != nil || ev["start"] != nil {
+		t.Errorf("после сети = %v", ev)
+	}
+
+	f.offline.Store(true)
+	send(c, map[string]any{"cmd": "playerError", "track": "21", "message": "tcp: timeout", "position": 3})
+	log.wait(t, "player", func(ev map[string]any) bool { return ev["offline"] == true })
+	send(c, map[string]any{"cmd": "playerNext", "track": "21", "position": 3})
+	ev = log.wait(t, "player", playing("22", "play"))
+	if ev["offline"] != nil {
+		t.Errorf("переключение не сбросило ожидание: %v", ev)
+	}
+	f.offline.Store(false)
+}
+
+func (f *fakeMusic) waveSeeds() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.seeds...)
+}
+
+func TestPlayerWaveFromSource(t *testing.T) {
+	c, f, log := startPlayerCore(t)
+
+	send(c, map[string]any{"cmd": "wave", "source": "https://music.yandex.ru/album/9", "track": "20", "title": "Al"})
+	ev := log.wait(t, "player", playing("1", "play"))
+	if src := ev["source"].(map[string]any); src["kind"] != "wave" || src["title"] != "Моя волна: Al" || ev["wave"] != true {
+		t.Errorf("волна по альбому = %v", ev["source"])
+	}
+
+	send(c, map[string]any{"cmd": "wave", "source": "https://music.yandex.ru/users/me/playlists/1001", "track": "21"})
+	log.wait(t, "player", playing("1", "play"))
+
+	send(c, map[string]any{"cmd": "wave", "track": "22", "title": "T22"})
+	log.wait(t, "player", playing("1", "play"))
+
+	link := "https://music.yandex.ru/users/me/playlists/1001"
+	send(c, map[string]any{"cmd": "play", "source": link, "track": "22"})
+	log.wait(t, "player", playing("22", "play"))
+	send(c, map[string]any{"cmd": "playerEnded", "track": "22", "position": 200})
+	ev = log.wait(t, "player", playing("1", "play"))
+	if ev["wave"] != true {
+		t.Errorf("после плейлиста не включилась волна: %v", ev)
+	}
+
+	want := []string{"album:9|", "playlist:me_1001|", "track:21|", "track:22|", "track:22|20:9,21:9,22:9"}
+	if got := f.waveSeeds(); strings.Join(got, " ") != strings.Join(want, " ") {
+		t.Errorf("сиды = %v", got)
 	}
 }

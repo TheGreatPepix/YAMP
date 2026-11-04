@@ -9,7 +9,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -68,6 +70,20 @@ func (s *Streamer) Prepare(ctx context.Context, trackID string, q Quality) (Form
 		return Format{}, err
 	}
 	return formatOf(src), nil
+}
+
+func (s *Streamer) Check(ctx context.Context, trackID string, q Quality) error {
+	_, err := s.source(ctx, trackID, q, true)
+	return err
+}
+
+func Offline(err error) bool {
+	if err == nil {
+		return false
+	}
+	var ue *url.Error
+	var ne net.Error
+	return errors.As(err, &ue) || errors.As(err, &ne) || errors.Is(err, context.DeadlineExceeded)
 }
 
 func formatOf(src source) Format {

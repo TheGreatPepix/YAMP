@@ -41,6 +41,7 @@ class FakePlayer {
   final List<String> failed = [];
   var _failures = 0;
   final List<String> ended = [];
+  final List<String> waves = [];
 
   Map<String, Object?> _track(int i, {String? id}) {
     final (title, artist, ms) = _songs[i % _songs.length];
@@ -187,6 +188,21 @@ class FakePlayer {
     'likedCount': _likes.length,
   });
 
+  void _startWave(String title) {
+    _wave = true;
+    _loading = true;
+    _queue = [];
+    _pos = 0;
+    _source = {'kind': 'wave', 'id': 'wave', 'title': title};
+    emitPlayer();
+    _later(const Duration(milliseconds: 200), () {
+      _loading = false;
+      _waveMore();
+      emitPlayer('play');
+      emitQueue();
+    });
+  }
+
   void _waveMore() {
     _queue = [
       ..._queue,
@@ -285,21 +301,14 @@ class FakePlayer {
               ],
           });
         });
+      case 'wave':
+        final title = '${c['title'] ?? ''}';
+        waves.add('${c['source'] ?? c['track']}');
+        _startWave(title.isEmpty ? 'Моя волна' : 'Моя волна: $title');
       case 'play':
         final source = '${c['source']}';
         if (source == 'wave') {
-          _wave = true;
-          _loading = true;
-          _queue = [];
-          _pos = 0;
-          _source = {'kind': 'wave', 'id': 'wave', 'title': 'Моя волна'};
-          emitPlayer();
-          _later(const Duration(milliseconds: 200), () {
-            _loading = false;
-            _waveMore();
-            emitPlayer('play');
-            emitQueue();
-          });
+          _startWave('Моя волна');
           return true;
         }
         _wave = false;

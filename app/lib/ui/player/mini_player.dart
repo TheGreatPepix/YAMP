@@ -138,7 +138,12 @@ class _Desktop extends StatelessWidget {
                       const SizedBox(width: 4),
                       LikeButton(p: p, track: t),
                       if (p.wave && roomy) DislikeButton(p: p, track: t),
-                      if (roomy) TrackMenu(track: t, onOpen: onOpen, onDownload: onDownload),
+                      if (roomy) TrackMenu(
+                          track: t,
+                          onOpen: onOpen,
+                          onDownload: onDownload,
+                          onWave: () => p.playWave(track: t),
+                        ),
                     ],
                   ],
                 ),

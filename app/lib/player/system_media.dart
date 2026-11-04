@@ -35,6 +35,12 @@ class SystemMedia {
         player.nextTrack();
       case 'previous':
         player.previousTrack();
+      case 'like':
+        final t = player.track;
+        if (t != null) player.like(t, !player.liked(t));
+      case 'dislike':
+        final t = player.track;
+        if (t != null) player.dislike(t, !player.disliked(t));
       case 'seek':
         final ms = call.arguments;
         if (ms is num) player.seek(Duration(milliseconds: ms.toInt()));
@@ -54,6 +60,8 @@ class SystemMedia {
       'duration': duration.inMilliseconds,
       'playing': player.playing,
       'buffering': player.buffering || player.loading,
+      'liked': player.liked(t),
+      'disliked': player.disliked(t),
     };
   }
 

@@ -20,6 +20,7 @@ import android.media.MediaMetadata
 import android.media.session.MediaSession
 import android.media.session.PlaybackState
 import android.os.Build
+import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
@@ -41,6 +42,8 @@ class PlaybackService : Service() {
         val position: Long,
         val playing: Boolean,
         val buffering: Boolean,
+        val liked: Boolean,
+        val disliked: Boolean,
     ) {
         companion object {
             fun from(map: Map<*, *>) = Track(
@@ -53,18 +56,23 @@ class PlaybackService : Service() {
                 position = (map["position"] as? Number)?.toLong() ?: 0,
                 playing = map["playing"] == true,
                 buffering = map["buffering"] == true,
+                liked = map["liked"] == true,
+                disliked = map["disliked"] == true,
             )
         }
     }
 
     companion object {
-        private const val CHANNEL = "playback"
+        private const val CHANNEL = "player"
+        private const val OLD_CHANNEL = "playback"
         private const val ID = 2
         private const val ACTION_PLAY = "ru.yamp.app.PLAY"
         private const val ACTION_PAUSE = "ru.yamp.app.PAUSE"
         private const val ACTION_NEXT = "ru.yamp.app.NEXT"
         private const val ACTION_PREVIOUS = "ru.yamp.app.PREVIOUS"
         private const val ACTION_DISMISS = "ru.yamp.app.DISMISS"
+        private const val ACTION_LIKE = "ru.yamp.app.LIKE"
+        private const val ACTION_DISLIKE = "ru.yamp.app.DISLIKE"
 
         private val main = Handler(Looper.getMainLooper())
         private var channel: MethodChannel? = null
@@ -157,6 +165,7 @@ class PlaybackService : Service() {
         super.onCreate()
         instance = this
         audio = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) manager().deleteNotificationChannel(OLD_CHANNEL)
         session = MediaSession(this, "YAMP").apply {
             @Suppress("DEPRECATION")
             setFlags(MediaSession.FLAG_HANDLES_MEDIA_BUTTONS or MediaSession.FLAG_HANDLES_TRANSPORT_CONTROLS)
@@ -167,6 +176,12 @@ class PlaybackService : Service() {
                 override fun onSkipToNext() = command("next")
                 override fun onSkipToPrevious() = command("previous")
                 override fun onSeekTo(pos: Long) = command("seek", pos)
+                override fun onCustomAction(action: String, extras: Bundle?) {
+                    when (action) {
+                        ACTION_LIKE -> command("like")
+                        ACTION_DISLIKE -> command("dislike")
+                    }
+                }
             })
             setSessionActivity(openApp())
             isActive = true
@@ -181,6 +196,8 @@ class PlaybackService : Service() {
             ACTION_PAUSE -> command("pause")
             ACTION_NEXT -> command("next")
             ACTION_PREVIOUS -> command("previous")
+            ACTION_LIKE -> command("like")
+            ACTION_DISLIKE -> command("dislike")
             ACTION_DISMISS -> {
                 if (track?.playing != true) stopSelf()
                 return START_NOT_STICKY
@@ -276,6 +293,20 @@ class PlaybackService : Service() {
                     PlaybackState.ACTION_SKIP_TO_NEXT or PlaybackState.ACTION_SKIP_TO_PREVIOUS,
             )
             .setState(state, t.position, speed, SystemClock.elapsedRealtime())
+            .addCustomAction(
+                PlaybackState.CustomAction.Builder(
+                    ACTION_DISLIKE,
+                    if (t.disliked) "Убрать дизлайк" else "Не нравится",
+                    if (t.disliked) R.drawable.ic_disliked else R.drawable.ic_dislike,
+                ).build(),
+            )
+            .addCustomAction(
+                PlaybackState.CustomAction.Builder(
+                    ACTION_LIKE,
+                    if (t.liked) "Убрать из любимых" else "Нравится",
+                    if (t.liked) R.drawable.ic_liked else R.drawable.ic_like,
+                ).build(),
+            )
             .build()
     }
 
@@ -370,8 +401,12 @@ class PlaybackService : Service() {
     private fun builder(): Notification.Builder {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             manager().createNotificationChannel(
-                NotificationChannel(CHANNEL, "Воспроизведение", NotificationManager.IMPORTANCE_LOW).apply {
+                NotificationChannel(CHANNEL, "Плеер", NotificationManager.IMPORTANCE_DEFAULT).apply {
                     setShowBadge(false)
+                    setSound(null, null)
+                    enableVibration(false)
+                    enableLights(false)
+                    lockscreenVisibility = Notification.VISIBILITY_PUBLIC
                 },
             )
             return Notification.Builder(this, CHANNEL)
@@ -391,6 +426,16 @@ class PlaybackService : Service() {
         } else {
             button(android.R.drawable.ic_media_play, "Играть", ACTION_PLAY, 1)
         }
+        val like = if (t.liked) {
+            button(R.drawable.ic_liked, "Убрать из любимых", ACTION_LIKE, 6)
+        } else {
+            button(R.drawable.ic_like, "Нравится", ACTION_LIKE, 6)
+        }
+        val dislike = if (t.disliked) {
+            button(R.drawable.ic_disliked, "Убрать дизлайк", ACTION_DISLIKE, 7)
+        } else {
+            button(R.drawable.ic_dislike, "Не нравится", ACTION_DISLIKE, 7)
+        }
         val b = builder()
             .setSmallIcon(android.R.drawable.ic_media_play)
             .setContentTitle(t.title)
@@ -399,16 +444,19 @@ class PlaybackService : Service() {
             .setContentIntent(openApp())
             .setDeleteIntent(action(ACTION_DISMISS, 5))
             .setVisibility(Notification.VISIBILITY_PUBLIC)
+            .setCategory(Notification.CATEGORY_TRANSPORT)
             .setOnlyAlertOnce(true)
             .setShowWhen(false)
             .setOngoing(t.playing)
+            .addAction(like)
             .addAction(button(android.R.drawable.ic_media_previous, "Предыдущий", ACTION_PREVIOUS, 3))
             .addAction(toggle)
             .addAction(button(android.R.drawable.ic_media_next, "Следующий", ACTION_NEXT, 4))
+            .addAction(dislike)
             .setStyle(
                 Notification.MediaStyle()
                     .setMediaSession(session.sessionToken)
-                    .setShowActionsInCompactView(0, 1, 2),
+                    .setShowActionsInCompactView(1, 2, 3),
             )
         if (coverUrl == t.art) cover?.let { b.setLargeIcon(it) }
         return b.build()
