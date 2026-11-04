@@ -34,6 +34,7 @@ class FakePlayer {
   var _wave = false;
   var _loading = false;
   var _quality = 'lossless';
+  var _auto = true;
   var _volume = 0.8;
   var _next = 100;
   Map<String, Object?>? _source;
@@ -159,6 +160,7 @@ class FakePlayer {
       'wave': _wave,
       'loading': _loading,
       'quality': _quality,
+      'autoQuality': _auto,
       'volume': _volume,
       'source': ?_source,
     });
@@ -391,7 +393,8 @@ class FakePlayer {
         _shuffle = c['on'] == true;
         emitPlayer();
       case 'playerQuality':
-        _quality = '${c['quality']}';
+        _auto = c['quality'] == 'auto';
+        _quality = _auto ? 'lossless' : '${c['quality']}';
         emitPlayer('resume');
       case 'playerVolume':
         _volume = ((c['volume'] as num?) ?? _volume).toDouble();

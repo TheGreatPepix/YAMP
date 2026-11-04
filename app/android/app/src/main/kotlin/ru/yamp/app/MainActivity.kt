@@ -53,8 +53,11 @@ class MainActivity : FlutterActivity() {
             override fun onListen(arguments: Any?, events: EventChannel.EventSink?) = CoreBridge.attach(events)
             override fun onCancel(arguments: Any?) = CoreBridge.attach(null)
         })
-        MethodChannel(messenger, "yamp/android").setMethodCallHandler { call, result ->
+        val android = MethodChannel(messenger, "yamp/android")
+        NetworkWatch.attach(this, android)
+        android.setMethodCallHandler { call, result ->
             when (call.method) {
+                "metered" -> result.success(NetworkWatch.current(this))
                 "open" -> result.success(open(call.arguments as String))
                 "openFolder" -> result.success(openFolder(call.arguments as String))
                 "pickFolder" -> pickFolder(call.arguments as String?, result)

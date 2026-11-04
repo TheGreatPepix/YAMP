@@ -11,7 +11,7 @@ import (
 	"yamp/internal/yam"
 )
 
-const Version = "0.1.3"
+const Version = "0.1.4"
 
 const (
 	accNone     = "none"
@@ -32,6 +32,7 @@ type App struct {
 
 	mu      sync.Mutex
 	cfg     config
+	metered bool
 	token   string
 	session *yam.Session
 	account accountEvent

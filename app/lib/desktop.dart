@@ -47,6 +47,20 @@ class Desktop {
     _call('tray', {'open': 'Открыть YAMP', 'exit': 'Выход'});
   }
 
+  bool get detectsNetwork => Platform.isAndroid;
+
+  Future<void> watchNetwork(void Function(bool metered) changed) async {
+    if (!Platform.isAndroid) return;
+    _android.setMethodCallHandler((call) async {
+      if (call.method == 'network' && call.arguments is bool) changed(call.arguments as bool);
+    });
+    try {
+      changed(await _android.invokeMethod<bool>('metered') ?? false);
+    } on MissingPluginException {
+      return;
+    }
+  }
+
   void showWindow() => _call('show');
 
   bool get canCompact => Platform.isWindows;
@@ -57,6 +71,8 @@ class Desktop {
   Future<void> pin(bool on) => _call('pin', {'on': on});
 
   void drag() => _call('drag');
+
+  void resize(String edge) => _call('resize', {'edge': edge});
 
   Future<bool> _androidCall(String method, String arg) async {
     try {

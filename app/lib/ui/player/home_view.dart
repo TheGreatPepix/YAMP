@@ -146,6 +146,7 @@ class _RowState extends State<_Row> {
     final phone = widget.phone;
     final size = phone ? 136.0 : 168.0;
     final list = ListView.separated(
+      key: PageStorageKey<String>('home:${widget.title}'),
       controller: _scroll,
       scrollDirection: Axis.horizontal,
       itemCount: widget.hits.length,

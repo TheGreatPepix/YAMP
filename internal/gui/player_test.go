@@ -612,3 +612,73 @@ func TestPlayerResumeWave(t *testing.T) {
 		t.Errorf("волна после восстановления = %v", got)
 	}
 }
+
+func TestPlayerAutoQuality(t *testing.T) {
+	c, _, log := startPlayerCore(t)
+	link := "https://music.yandex.ru/users/me/playlists/1001"
+
+	send(c, map[string]any{"cmd": "play", "source": link, "track": "21"})
+	ev := log.wait(t, "player", playing("21", "play"))
+	if ev["quality"] != "lossless" || ev["autoQuality"] != true {
+		t.Fatalf("по умолчанию авто и FLAC: %v %v", ev["quality"], ev["autoQuality"])
+	}
+
+	send(c, map[string]any{"cmd": "network", "metered": true})
+	st := log.wait(t, "state", func(m map[string]any) bool { return m["metered"] == true })
+	if st["playQuality"] != "mp3" || st["playMobile"] != "mp3" || st["playWifi"] != "lossless" || st["playAuto"] != true {
+		t.Errorf("состояние в мобильной сети = %v", st)
+	}
+	ev = log.wait(t, "player", func(m map[string]any) bool { return m["quality"] == "mp3" })
+	if ev["action"] != nil || !strings.HasSuffix(ev["url"].(string), "/21?q=mp3") {
+		t.Errorf("смена сети не должна перезапускать трек: %v %v", ev["action"], ev["url"])
+	}
+
+	send(c, map[string]any{"cmd": "playQuality", "mobile": "low"})
+	log.wait(t, "player", playing("21", "resume"))
+
+	send(c, map[string]any{"cmd": "playQuality", "auto": false, "quality": "lossless"})
+	ev = log.wait(t, "player", playing("21", "resume"))
+	if ev["quality"] != "lossless" || ev["autoQuality"] != nil {
+		t.Errorf("вручную = %v %v", ev["quality"], ev["autoQuality"])
+	}
+	cfg := loadConfig()
+	if cfg.autoQuality() || cfg.mobileQuality() != yam.Low || cfg.PlayQuality != "lossless" {
+		t.Errorf("настройки не сохранились: %+v", cfg)
+	}
+
+	send(c, map[string]any{"cmd": "playerQuality", "quality": "auto"})
+	ev = log.wait(t, "player", playing("21", "resume"))
+	if ev["quality"] != "low" || ev["autoQuality"] != true {
+		t.Errorf("снова авто = %v %v", ev["quality"], ev["autoQuality"])
+	}
+}
+
+func TestPlayerWaveKeepsCurrentTrack(t *testing.T) {
+	c, f, log := startPlayerCore(t)
+	link := "https://music.yandex.ru/users/me/playlists/1001"
+
+	send(c, map[string]any{"cmd": "play", "source": link, "track": "21"})
+	log.wait(t, "player", playing("21", "play"))
+
+	send(c, map[string]any{"cmd": "wave", "track": "21", "title": "T21"})
+	q := log.wait(t, "queue", func(ev map[string]any) bool {
+		src, _ := ev["source"].(map[string]any)
+		return src != nil && src["kind"] == "wave" && len(ev["tracks"].([]any)) == 3
+	})
+	var ids []string
+	for _, it := range q["tracks"].([]any) {
+		ids = append(ids, it.(map[string]any)["id"].(string))
+	}
+	if strings.Join(ids, ",") != "21,1,2" || q["pos"] != 0.0 {
+		t.Errorf("очередь волны = %v на %v", ids, q["pos"])
+	}
+	if got := f.waveSeeds(); len(got) != 1 || got[0] != "track:21|21:9" {
+		t.Errorf("сиды = %v", got)
+	}
+
+	send(c, map[string]any{"cmd": "playerEnded", "track": "21", "position": 200})
+	ev := log.wait(t, "player", playing("1", "play"))
+	if ev["wave"] != true {
+		t.Errorf("после текущего трека не волна: %v", ev)
+	}
+}

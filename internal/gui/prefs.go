@@ -23,7 +23,10 @@ type config struct {
 	Quality     string `json:"quality"`
 	Concurrency int    `json:"concurrency"`
 
-	PlayQuality string   `json:"playQuality,omitempty"`
+	PlayQuality   string `json:"playQuality,omitempty"`
+	AutoQuality   *bool  `json:"autoQuality,omitempty"`
+	WifiQuality   string `json:"wifiQuality,omitempty"`
+	MobileQuality string `json:"mobileQuality,omitempty"`
 	Volume      *float64 `json:"volume,omitempty"`
 	Repeat      string   `json:"repeat,omitempty"`
 	Shuffle     bool     `json:"shuffle,omitempty"`
@@ -84,6 +87,12 @@ func loadConfig() config {
 			}
 			c.Token, c.Refresh, c.Expires, c.DeviceID = saved.Token, saved.Refresh, saved.Expires, saved.DeviceID
 			c.PlayQuality = string(playQuality(saved.PlayQuality))
+			c.AutoQuality = saved.AutoQuality
+			c.WifiQuality = string(playQuality(saved.WifiQuality))
+			c.MobileQuality = string(c.mobileQuality())
+			if saved.MobileQuality != "" {
+				c.MobileQuality = string(playQuality(saved.MobileQuality))
+			}
 			if saved.Volume != nil {
 				v := clampVolume(*saved.Volume)
 				c.Volume = &v
@@ -122,6 +131,31 @@ func playQuality(s string) yam.Quality {
 		return yam.Quality(s)
 	}
 	return yam.Lossless
+}
+
+func (c config) autoQuality() bool {
+	return c.AutoQuality == nil || *c.AutoQuality
+}
+
+func (c config) wifiQuality() yam.Quality {
+	return playQuality(c.WifiQuality)
+}
+
+func (c config) mobileQuality() yam.Quality {
+	if c.MobileQuality == "" {
+		return yam.MP3
+	}
+	return playQuality(c.MobileQuality)
+}
+
+func (c config) playback(metered bool) yam.Quality {
+	switch {
+	case !c.autoQuality():
+		return playQuality(c.PlayQuality)
+	case metered:
+		return c.mobileQuality()
+	}
+	return c.wifiQuality()
 }
 
 func (c config) quality() yam.Quality {

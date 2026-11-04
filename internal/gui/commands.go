@@ -34,6 +34,10 @@ type uiCommand struct {
 	Volume      float64  `json:"volume"`
 	Seeds       []string `json:"seeds"`
 	Message     string   `json:"message"`
+	Auto        *bool    `json:"auto"`
+	Wifi        string   `json:"wifi"`
+	Mobile      string   `json:"mobile"`
+	Metered     bool     `json:"metered"`
 	Discord     *bool    `json:"discord"`
 	Title       string   `json:"title"`
 	Artist      string   `json:"artist"`
@@ -121,6 +125,10 @@ func (g *App) onMessage(message string) {
 		g.playerFailed(c.Track, c.Message, c.Position)
 	case "playerQuality":
 		g.setPlayerQuality(c.Quality)
+	case "playQuality":
+		g.setPlayback(c)
+	case "network":
+		g.setMetered(c.Metered)
 	case "playerVolume":
 		g.setVolume(c.Volume)
 	case "playerRepeat":

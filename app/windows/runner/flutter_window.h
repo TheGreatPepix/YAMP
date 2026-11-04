@@ -53,6 +53,7 @@ class FlutterWindow : public Win32Window {
   bool compact_ = false;
   bool pinned_ = false;
   int compact_width_ = 0, compact_height_ = 0;
+  int compact_min_width_ = 380, compact_min_height_ = 168;
   LONG_PTR saved_style_ = 0;
   WINDOWPLACEMENT saved_place_ = {sizeof(WINDOWPLACEMENT)};
   bool active_ = false;

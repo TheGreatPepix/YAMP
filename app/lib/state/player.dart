@@ -254,6 +254,7 @@ class PlayerState extends ChangeNotifier {
   var loading = false;
   var offline = false;
   var quality = PlayQuality.lossless;
+  var autoQuality = false;
   var volume = 0.8;
   PlaySource? source;
   var format = '';
@@ -410,6 +411,7 @@ class PlayerState extends ChangeNotifier {
     loading = ev['loading'] == true;
     offline = ev['offline'] == true;
     quality = PlayQuality.values.asNameMap()[_s(ev['quality'])] ?? PlayQuality.lossless;
+    autoQuality = ev['autoQuality'] == true;
     volume = (ev['volume'] as num?)?.toDouble() ?? volume;
     final s = ev['source'];
     source = s is Map<String, dynamic> ? PlaySource.fromJson(s) : null;
@@ -663,6 +665,8 @@ class PlayerState extends ChangeNotifier {
   void toggleShuffle() => _send({'cmd': 'playerShuffle', 'on': !shuffle});
 
   void setQuality(PlayQuality q) => _send({'cmd': 'playerQuality', 'quality': q.name});
+
+  void setAutoQuality() => _send({'cmd': 'playerQuality', 'quality': 'auto'});
 
   void play(String source, {String? track, int index = 0}) {
     if (_blocked()) return;

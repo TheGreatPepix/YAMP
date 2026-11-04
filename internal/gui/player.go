@@ -119,6 +119,7 @@ type playerEvent struct {
 	Offline bool        `json:"offline,omitempty"`
 	Start   float64     `json:"start,omitempty"`
 	Quality string      `json:"quality"`
+	Auto    bool        `json:"autoQuality,omitempty"`
 	Volume  float64     `json:"volume"`
 	Source  *playSource `json:"source,omitempty"`
 }
@@ -550,6 +551,7 @@ type waveStart struct {
 	fallback []string
 	title    string
 	played   []yam.Track
+	keep     *yam.Track
 }
 
 func waveSeeds(source, trackID string) (seeds, fallback []string) {
@@ -589,7 +591,17 @@ func (g *App) waveFrom(source, trackID, title string) {
 	if title != "" {
 		title = "Моя волна: " + title
 	}
-	g.startWave(sess, waveStart{seeds: seeds, fallback: fallback, title: title})
+	start := waveStart{seeds: seeds, fallback: fallback, title: title}
+	if source == "" && trackID != "" {
+		p := g.player
+		p.mu.Lock()
+		if cur, ok := p.queue.Current(); ok && cur.ID == trackID {
+			start.keep = &cur
+			start.played = []yam.Track{cur}
+		}
+		p.mu.Unlock()
+	}
+	g.startWave(sess, start)
 }
 
 func (g *App) startWave(sess *yam.Session, start waveStart) {
@@ -611,9 +623,13 @@ func (g *App) startWave(sess *yam.Session, start waveStart) {
 	seq := p.seq
 	p.queue.SetRepeat(repeat)
 	p.queue.SetShuffle(false)
-	p.queue.Clear()
+	if start.keep != nil {
+		p.queue.Set([]yam.Track{*start.keep}, 0)
+	} else {
+		p.queue.Clear()
+	}
 	p.source = &playSource{Kind: sourceWave, ID: sourceWave, Title: title}
-	p.wave = &waveState{seeds: seeds, batches: map[string]string{}, loading: true, pending: true}
+	p.wave = &waveState{seeds: seeds, batches: map[string]string{}, loading: true, pending: start.keep == nil}
 	p.failures, p.offline = 0, false
 	p.mu.Unlock()
 	g.emitPlayer("")
@@ -647,6 +663,11 @@ func (g *App) startWave(sess *yam.Session, start waveStart) {
 			p.wave, p.source = nil, nil
 			p.mu.Unlock()
 			g.notice("Не удалось запустить Мою волну: "+searchError(err), "error")
+			if start.keep != nil {
+				g.emitPlayer("")
+				g.emitQueue()
+				return
+			}
 			g.emitPlayer(actStop)
 			return
 		}
@@ -662,13 +683,19 @@ func (g *App) startWave(sess *yam.Session, start waveStart) {
 				fresh = append(fresh, t)
 			}
 		}
-		if len(fresh) == 0 {
+		if len(fresh) == 0 && start.keep == nil {
 			fresh = batch.Tracks
 		}
-		p.queue.Set(fresh, 0)
+		action := actPlay
+		if start.keep != nil {
+			p.queue.Append(fresh)
+			action = ""
+		} else {
+			p.queue.Set(fresh, 0)
+		}
 		p.mu.Unlock()
 		p.reports.run(func() { g.waveFeedback(sess, batch.Session, batch.Batch, yam.WaveStarted, "", 0) })
-		g.emitPlayer(actPlay)
+		g.emitPlayer(action)
 		g.emitQueue()
 	}()
 }
@@ -925,7 +952,7 @@ func (g *App) playerFailed(trackID, message string, position float64) {
 
 func (g *App) offline(trackID string) bool {
 	g.mu.Lock()
-	q := playQuality(g.cfg.PlayQuality)
+	q := g.cfg.playback(g.metered)
 	g.mu.Unlock()
 	ctx, cancel := context.WithTimeout(context.Background(), probeTimeout)
 	defer cancel()
@@ -970,14 +997,62 @@ func (g *App) retryAt(position float64) {
 }
 
 func (g *App) setPlayerQuality(q string) {
+	g.changePlayback(func(c *config) {
+		auto := q == "auto"
+		c.AutoQuality = &auto
+		if !auto {
+			c.PlayQuality = string(playQuality(q))
+		}
+	})
+}
+
+func (g *App) setPlayback(c uiCommand) {
+	g.changePlayback(func(cfg *config) {
+		if c.Auto != nil {
+			auto := *c.Auto
+			cfg.AutoQuality = &auto
+		}
+		if c.Quality != "" {
+			cfg.PlayQuality = string(playQuality(c.Quality))
+		}
+		if c.Wifi != "" {
+			cfg.WifiQuality = string(playQuality(c.Wifi))
+		}
+		if c.Mobile != "" {
+			cfg.MobileQuality = string(playQuality(c.Mobile))
+		}
+	})
+}
+
+func (g *App) changePlayback(change func(c *config)) {
 	g.mu.Lock()
-	g.cfg.PlayQuality = string(playQuality(q))
+	before := g.cfg.playback(g.metered)
+	change(&g.cfg)
+	after := g.cfg.playback(g.metered)
 	err := g.cfg.save()
 	g.mu.Unlock()
 	if err != nil {
 		g.notice("Не удалось сохранить настройки: "+err.Error(), "error")
 	}
-	g.emitPlayer(actResume)
+	g.emitState(false)
+	if after != before {
+		g.emitPlayer(actResume)
+		return
+	}
+	g.emitPlayer("")
+}
+
+func (g *App) setMetered(on bool) {
+	g.mu.Lock()
+	changed := g.metered != on
+	g.metered = on
+	g.mu.Unlock()
+	if !changed {
+		return
+	}
+	g.logf("Сеть: %s", map[bool]string{true: "мобильная", false: "безлимитная"}[on])
+	g.emitState(false)
+	g.emitPlayer("")
 }
 
 func (g *App) setVolume(v float64) {
@@ -1109,14 +1184,14 @@ func (g *App) emitMark(trackID string) {
 
 func (g *App) emitPlayer(action string) {
 	g.mu.Lock()
-	q, vol := playQuality(g.cfg.PlayQuality), g.cfg.volume()
+	q, vol, auto := g.cfg.playback(g.metered), g.cfg.volume(), g.cfg.autoQuality()
 	g.mu.Unlock()
 
 	p := g.player
 	p.mu.Lock()
 	ev := playerEvent{
 		Type: "player", Action: action, Pos: p.queue.Pos(), Count: p.queue.Len(),
-		Repeat: string(p.queue.Repeat()), Shuffle: p.queue.Shuffle(), Quality: string(q), Volume: vol,
+		Repeat: string(p.queue.Repeat()), Shuffle: p.queue.Shuffle(), Quality: string(q), Auto: auto, Volume: vol,
 		Wave: p.wave != nil, Loading: p.offline || (p.wave != nil && p.wave.pending), Offline: p.offline,
 	}
 	switch action {

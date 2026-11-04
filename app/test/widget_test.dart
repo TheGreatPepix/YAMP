@@ -6,13 +6,14 @@ import 'package:yamp/app.dart';
 import 'package:yamp/core/core.dart';
 import 'package:yamp/core/fake_core.dart';
 import 'package:yamp/state/controller.dart';
+import 'package:yamp/state/player.dart';
 import 'package:yamp/state/models.dart';
 import 'package:yamp/state/search.dart';
 import 'package:yamp/ui/search_view.dart';
 
 Future<(FakeCore, Controller)> _open(
   WidgetTester tester, {
-  String latest = '0.1.3',
+  String latest = '0.1.4',
   Duration tick = const Duration(milliseconds: 120),
 }) async {
   tester.view.physicalSize = const Size(1280, 860);
@@ -87,7 +88,7 @@ void main() {
     final (core, c) = await _open(tester);
 
     expect(c.ready, isTrue);
-    expect(c.version, '0.1.3');
+    expect(c.version, '0.1.4');
     expect(find.text('Войти через Яндекс'), findsOneWidget);
     expect(find.text('Моя волна'), findsNothing);
 
@@ -197,7 +198,10 @@ void main() {
 
     await tester.tap(find.byTooltip('Настройки'));
     await tester.pumpAndSettle();
-    expect(find.text('Версия 0.1.3'), findsOneWidget);
+    expect(find.text('Качество звука'), findsOneWidget);
+    await tester.tap(find.text('О программе'));
+    await tester.pumpAndSettle();
+    expect(find.text('Версия 0.1.4'), findsOneWidget);
 
     await tester.tap(find.text('Проверить'));
     await tester.pump();
@@ -208,6 +212,61 @@ void main() {
     expect(find.text('Это последняя версия'), findsOneWidget);
 
     await tester.pumpAndSettle(const Duration(seconds: 5));
+    await core.close();
+  });
+
+  testWidgets('настройки: авто-качество и ручной выбор', (tester) async {
+    final (core, c) = await _open(tester);
+    await _login(tester, 'good-token');
+
+    await tester.tap(find.byTooltip('Настройки'));
+    await tester.pumpAndSettle();
+    expect(find.text('Wi-Fi и кабель'), findsOneWidget);
+    expect(find.text('Мобильный интернет'), findsOneWidget);
+    await tester.tap(find.text('Эконом').last);
+    await tester.pumpAndSettle();
+    expect(core.playQuality.last, {'cmd': 'playQuality', 'mobile': 'low'});
+    expect(c.playMobile, PlayQuality.low);
+
+    await tester.tap(find.text('Вручную'));
+    await tester.pumpAndSettle();
+    expect(core.playQuality.last, containsPair('auto', false));
+    expect(find.text('Всегда'), findsOneWidget);
+    expect(find.text('Wi-Fi и кабель'), findsNothing);
+    await tester.tap(find.text('MP3 320'));
+    await tester.pumpAndSettle();
+    expect(core.playQuality.last, {'cmd': 'playQuality', 'auto': false, 'quality': 'mp3'});
+
+    await tester.tap(find.text('Загрузки'));
+    await tester.pumpAndSettle();
+    expect(find.text('Одновременных загрузок'), findsOneWidget);
+    await tester.tap(find.byTooltip('Закрыть'));
+    await tester.pumpAndSettle();
+    expect(find.text('Одновременных загрузок'), findsNothing);
+    await core.close();
+  });
+
+  testWidgets('настройки на телефоне: список разделов и назад', (tester) async {
+    final (core, c) = await _open(tester);
+    await _login(tester, 'good-token');
+    tester.view.physicalSize = const Size(360, 760);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Меню'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Настройки'));
+    await tester.pumpAndSettle();
+    expect(find.text('Прослушивание'), findsOneWidget);
+    expect(find.text('Авто: Wi-Fi FLAC, мобильный MP3 320'), findsOneWidget);
+    await tester.tap(find.text('Оформление'));
+    await tester.pumpAndSettle();
+    expect(find.text('Светлая'), findsOneWidget);
+    await tester.tap(find.byTooltip('Назад'));
+    await tester.pumpAndSettle();
+    expect(find.text('О программе'), findsOneWidget);
+    await tester.tap(find.byTooltip('Закрыть'));
+    await tester.pumpAndSettle();
+    expect(find.text('О программе'), findsNothing);
     await core.close();
   });
 

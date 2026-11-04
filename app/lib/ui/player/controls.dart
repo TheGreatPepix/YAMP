@@ -263,7 +263,6 @@ class _SeekBarState extends State<SeekBar> {
           child: Slider(
             value: now,
             max: max,
-            divisions: total.inSeconds >= 10 ? (total.inSeconds / 5).ceil() : null,
             semanticFormatterCallback: (v) => '${fmtTime(Duration(seconds: v.round()))} из ${fmtTime(total)}',
             onChanged: p.hasTrack && total > Duration.zero ? (v) => setState(() => _drag = v) : null,
             onChangeEnd: (v) {
@@ -361,15 +360,21 @@ class QualityMenu extends StatelessWidget {
     return MenuAnchor(
       alignmentOffset: const Offset(0, -4),
       menuChildren: [
+        MenuItemButton(
+          leadingIcon: Icon(p.autoQuality ? Icons.check_rounded : null),
+          onPressed: p.setAutoQuality,
+          child: const Text('Авто: по типу сети'),
+        ),
+        const Divider(height: 8),
         for (final q in PlayQuality.values)
           MenuItemButton(
-            leadingIcon: Icon(p.quality == q ? Icons.check_rounded : null),
+            leadingIcon: Icon(!p.autoQuality && p.quality == q ? Icons.check_rounded : null),
             onPressed: () => p.setQuality(q),
             child: Text(qualityLabel(q)),
           ),
       ],
       builder: (context, menu, _) => Tooltip(
-        message: 'Качество: ${qualityLabel(p.quality)}',
+        message: p.autoQuality ? 'Качество: авто, сейчас ${qualityLabel(p.quality)}' : 'Качество: ${qualityLabel(p.quality)}',
         child: InkWell(
           borderRadius: BorderRadius.circular(8),
           onTap: () => menu.isOpen ? menu.close() : menu.open(),

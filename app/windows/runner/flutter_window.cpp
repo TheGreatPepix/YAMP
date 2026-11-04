@@ -4,6 +4,7 @@
 #include <flutter/standard_method_codec.h>
 #include <flutter_windows.h>
 
+#include <algorithm>
 #include <optional>
 
 #include "flutter/generated_plugin_registrant.h"
@@ -160,6 +161,23 @@ void FlutterWindow::HandleCall(
     }
   } else if (method == "pin") {
     Pin(BoolArg(call.arguments(), "on"));
+  } else if (method == "resize") {
+    if (HWND hwnd = GetHandle(); hwnd && compact_) {
+      auto edge = StringArg(call.arguments(), "edge");
+      WPARAM side = 0;
+      if (edge == L"left") side = WMSZ_LEFT;
+      else if (edge == L"right") side = WMSZ_RIGHT;
+      else if (edge == L"top") side = WMSZ_TOP;
+      else if (edge == L"bottom") side = WMSZ_BOTTOM;
+      else if (edge == L"topLeft") side = WMSZ_TOPLEFT;
+      else if (edge == L"topRight") side = WMSZ_TOPRIGHT;
+      else if (edge == L"bottomLeft") side = WMSZ_BOTTOMLEFT;
+      else if (edge == L"bottomRight") side = WMSZ_BOTTOMRIGHT;
+      if (side != 0) {
+        ReleaseCapture();
+        SendMessageW(hwnd, WM_SYSCOMMAND, SC_SIZE | side, 0);
+      }
+    }
   } else if (method == "drag") {
     if (HWND hwnd = GetHandle()) {
       ReleaseCapture();
@@ -213,11 +231,8 @@ SIZE FlutterWindow::CompactFrame() {
   HWND hwnd = GetHandle();
   HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
   double scale = FlutterDesktopGetDpiForMonitor(monitor) / 96.0;
-  RECT frame = {0, 0, static_cast<LONG>(compact_width_ * scale),
-                static_cast<LONG>(compact_height_ * scale)};
-  AdjustWindowRectEx(&frame, static_cast<DWORD>(GetWindowLongPtr(hwnd, GWL_STYLE)),
-                     FALSE, static_cast<DWORD>(GetWindowLongPtr(hwnd, GWL_EXSTYLE)));
-  return {frame.right - frame.left, frame.bottom - frame.top};
+  return {static_cast<LONG>(compact_width_ * scale),
+          static_cast<LONG>(compact_height_ * scale)};
 }
 
 void FlutterWindow::EnterCompact(int width, int height) {
@@ -225,8 +240,10 @@ void FlutterWindow::EnterCompact(int width, int height) {
   if (!hwnd) {
     return;
   }
-  compact_width_ = width;
-  compact_height_ = height;
+  compact_min_width_ = width;
+  compact_min_height_ = height;
+  compact_width_ = (std::max)(compact_width_, width);
+  compact_height_ = (std::max)(compact_height_, height);
   if (!compact_) {
     saved_place_.length = sizeof(saved_place_);
     GetWindowPlacement(hwnd, &saved_place_);
@@ -235,7 +252,8 @@ void FlutterWindow::EnterCompact(int width, int height) {
     if (IsZoomed(hwnd) || IsIconic(hwnd)) {
       ShowWindow(hwnd, SW_RESTORE);
     }
-    SetWindowLongPtr(hwnd, GWL_STYLE, (saved_style_ & ~WS_OVERLAPPEDWINDOW) | WS_POPUP);
+    SetWindowLongPtr(hwnd, GWL_STYLE,
+                     (saved_style_ & ~WS_OVERLAPPEDWINDOW) | WS_POPUP | WS_THICKFRAME);
     DWORD corner = kCornerRound;
     DwmSetWindowAttribute(hwnd, kCornerPreference, &corner, sizeof(corner));
   }
@@ -371,11 +389,29 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
       return 0;
     case WM_GETMINMAXINFO:
       if (compact_) {
-        SIZE size = CompactFrame();
+        double scale = FlutterDesktopGetDpiForMonitor(
+                           MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST)) /
+                       96.0;
         auto info = reinterpret_cast<MINMAXINFO*>(lparam);
-        info->ptMinTrackSize.x = size.cx;
-        info->ptMinTrackSize.y = size.cy;
+        info->ptMinTrackSize.x = static_cast<LONG>(compact_min_width_ * scale);
+        info->ptMinTrackSize.y = static_cast<LONG>(compact_min_height_ * scale);
+        info->ptMaxTrackSize.x = static_cast<LONG>(compact_min_width_ * 2 * scale);
+        info->ptMaxTrackSize.y = static_cast<LONG>(compact_min_height_ * 2.5 * scale);
         return 0;
+      }
+      break;
+    case WM_NCCALCSIZE:
+      if (compact_ && wparam == TRUE) {
+        return 0;
+      }
+      break;
+    case WM_SIZE:
+      if (compact_ && wparam != SIZE_MINIMIZED) {
+        double scale = FlutterDesktopGetDpiForMonitor(
+                           MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST)) /
+                       96.0;
+        compact_width_ = static_cast<int>(LOWORD(lparam) / scale + 0.5);
+        compact_height_ = static_cast<int>(HIWORD(lparam) / scale + 0.5);
       }
       break;
     case WM_CLOSE:

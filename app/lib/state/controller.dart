@@ -26,6 +26,7 @@ class Controller extends ChangeNotifier {
       if (downloadsOpen.value) player.panelOpen.value = false;
     });
     this.desktop.listen(exit: _trayExit);
+    this.desktop.watchNetwork((metered) => send({'cmd': 'network', 'metered': metered}));
     _presence = Presence(player, send);
   }
 
@@ -54,6 +55,12 @@ class Controller extends ChangeNotifier {
   var version = '';
   var discord = true;
   var discordAvailable = false;
+  var playAuto = true;
+  var playManual = PlayQuality.lossless;
+  var playWifi = PlayQuality.lossless;
+  var playMobile = PlayQuality.mp3;
+  var playNow = PlayQuality.lossless;
+  var metered = false;
 
   UpdateInfo? update;
   var checkingUpdate = false;
@@ -178,6 +185,30 @@ class Controller extends ChangeNotifier {
   void setDir(String d) {
     dir = d;
     send({'cmd': 'prefs', 'dir': d});
+    notifyListeners();
+  }
+
+  void setPlayAuto(bool on) {
+    playAuto = on;
+    send({'cmd': 'playQuality', 'auto': on});
+    notifyListeners();
+  }
+
+  void setPlayManual(PlayQuality q) {
+    playManual = q;
+    send({'cmd': 'playQuality', 'auto': false, 'quality': q.name});
+    notifyListeners();
+  }
+
+  void setPlayWifi(PlayQuality q) {
+    playWifi = q;
+    send({'cmd': 'playQuality', 'wifi': q.name});
+    notifyListeners();
+  }
+
+  void setPlayMobile(PlayQuality q) {
+    playMobile = q;
+    send({'cmd': 'playQuality', 'mobile': q.name});
     notifyListeners();
   }
 
@@ -346,6 +377,13 @@ class Controller extends ChangeNotifier {
         version = '${ev['version'] ?? ''}';
         discord = ev['discord'] != false;
         discordAvailable = ev['discordAvailable'] == true;
+        PlayQuality q(Object? v, PlayQuality or) => PlayQuality.values.asNameMap()['$v'] ?? or;
+        playAuto = ev['playAuto'] != false;
+        playManual = q(ev['playManual'], PlayQuality.lossless);
+        playWifi = q(ev['playWifi'], PlayQuality.lossless);
+        playMobile = q(ev['playMobile'], PlayQuality.mp3);
+        playNow = q(ev['playQuality'], playManual);
+        metered = ev['metered'] == true;
         if (ev['log'] is String) log.value = ev['log'] as String;
         ready = true;
       case 'account':

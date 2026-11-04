@@ -9,6 +9,12 @@ type uiState struct {
 	Version     string `json:"version"`
 	Discord     bool   `json:"discord"`
 	DiscordOK   bool   `json:"discordAvailable"`
+	PlayAuto    bool   `json:"playAuto"`
+	PlayManual  string `json:"playManual"`
+	PlayWifi    string `json:"playWifi"`
+	PlayMobile  string `json:"playMobile"`
+	PlayNow     string `json:"playQuality"`
+	Metered     bool   `json:"metered"`
 	Log         string `json:"log,omitempty"`
 }
 
@@ -23,6 +29,12 @@ func (g *App) emitState(withLog bool) {
 		Version:     Version,
 		Discord:     g.cfg.discord(),
 		DiscordOK:   g.discord.Enabled(),
+		PlayAuto:    g.cfg.autoQuality(),
+		PlayManual:  string(playQuality(g.cfg.PlayQuality)),
+		PlayWifi:    string(g.cfg.wifiQuality()),
+		PlayMobile:  string(g.cfg.mobileQuality()),
+		PlayNow:     string(g.cfg.playback(g.metered)),
+		Metered:     g.metered,
 	}
 	g.mu.Unlock()
 	if withLog {
