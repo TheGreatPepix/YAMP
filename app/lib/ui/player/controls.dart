@@ -501,21 +501,48 @@ List<Widget> pageItems(PlayTrack t, OpenPage onOpen, {String here = ''}) => [
 
 const waveByTrack = 'Моя волна по треку';
 
+List<Widget> shareItems(PlayTrack t, void Function(String link) share) => [
+  if (t.link.isNotEmpty)
+    MenuItemButton(
+      leadingIcon: const Icon(Icons.share_outlined),
+      onPressed: () => share(t.link),
+      child: const Text('Поделиться треком'),
+    ),
+  if (t.albumSource.isNotEmpty)
+    MenuItemButton(
+      leadingIcon: const Icon(Icons.album_outlined),
+      onPressed: () => share(t.albumSource),
+      child: const Text('Поделиться альбомом'),
+    ),
+];
+
 class TrackMenu extends StatelessWidget {
-  const TrackMenu({super.key, required this.track, required this.onOpen, this.onDownload, this.onWave, this.size});
+  const TrackMenu({
+    super.key,
+    required this.track,
+    required this.onOpen,
+    this.onDownload,
+    this.onWave,
+    this.onShare,
+    this.size,
+    this.onImage = false,
+  });
 
   final PlayTrack track;
   final OpenPage onOpen;
   final Download? onDownload;
   final VoidCallback? onWave;
+  final void Function(String link)? onShare;
   final double? size;
+  final bool onImage;
 
   @override
   Widget build(BuildContext context) {
     final pages = pageItems(track, onOpen);
     final downloads = onDownload == null ? const <Widget>[] : downloadItems(onDownload!, track.link, track.title);
     final wave = onWave;
-    if (pages.isEmpty && downloads.isEmpty && wave == null) return const SizedBox.shrink();
+    final shares = onShare == null ? const <Widget>[] : shareItems(track, onShare!);
+    if (pages.isEmpty && downloads.isEmpty && wave == null && shares.isEmpty) return const SizedBox.shrink();
     final box = size;
     return MenuAnchor(
       menuChildren: [
@@ -526,11 +553,17 @@ class TrackMenu extends StatelessWidget {
         ...downloads,
         if (downloads.isNotEmpty && pages.isNotEmpty) const Divider(height: 8),
         ...pages,
+        if (shares.isNotEmpty && (pages.isNotEmpty || downloads.isNotEmpty || wave != null)) const Divider(height: 8),
+        ...shares,
       ],
       builder: (context, menu, _) => IconButton(
         tooltip: 'Ещё',
         onPressed: () => menu.isOpen ? menu.close() : menu.open(),
-        style: box == null ? null : IconButton.styleFrom(fixedSize: Size.square(box), minimumSize: Size.square(box)),
+        style: IconButton.styleFrom(
+          fixedSize: box == null ? null : Size.square(box),
+          minimumSize: box == null ? null : Size.square(box),
+          backgroundColor: onImage ? Colors.black.withValues(alpha: 0.28) : null,
+        ),
         icon: const Icon(Icons.more_vert_rounded),
       ),
     );

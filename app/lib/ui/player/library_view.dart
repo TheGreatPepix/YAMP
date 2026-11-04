@@ -671,6 +671,12 @@ class ListHeader extends StatelessWidget {
                     _ => 'Волна по плейлисту',
                   }),
                 ),
+              if (artistOfTop(source).startsWith('http'))
+                OutlinedButton.icon(
+                  onPressed: () => c.share(artistOfTop(source)),
+                  icon: const Icon(Icons.share_outlined, size: 18),
+                  label: const Text('Поделиться'),
+                ),
               if (!top && kind != sourceHistory)
                 DownloadButton(
                   download: (link, q, name) => c.download(link, q, title: name),
@@ -824,6 +830,12 @@ class _More extends StatelessWidget {
             leadingIcon: const Icon(Icons.waves_rounded),
             onPressed: () => p.playWave(track: track),
             child: const Text(waveByTrack),
+          ),
+        if (track.link.isNotEmpty)
+          MenuItemButton(
+            leadingIcon: const Icon(Icons.share_outlined),
+            onPressed: () => c.share(track.link),
+            child: const Text('Поделиться'),
           ),
         if (!track.unavailable) ...[
           ...downloadItems((link, q, name) => c.download(link, q, title: name), track.link, track.title),

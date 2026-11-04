@@ -35,6 +35,8 @@ type fakeMusic struct {
 	likes    []string
 	waveCall int
 	seeds    []string
+
+	lyricCalls int
 }
 
 func newFakeMusic(t *testing.T) *fakeMusic {
@@ -138,6 +140,11 @@ func newFakeMusic(t *testing.T) *fakeMusic {
 			json.NewEncoder(w).Encode(map[string]any{"result": map[string]any{"downloadInfo": map[string]any{
 				"codec": "flac-mp4", "key": hex.EncodeToString(f.key), "urls": []string{f.srv.URL + "/file/" + r.URL.Query().Get("trackId")},
 			}}})
+		case "/tracks/20/lyrics":
+			f.lyricCalls++
+			json.NewEncoder(w).Encode(map[string]any{"result": map[string]any{"downloadUrl": f.srv.URL + "/lyrics/20", "writers": []string{"W"}}})
+		case "/lyrics/20":
+			w.Write([]byte("[00:01.00] Раз\n[00:03.00] Два\n"))
 		default:
 			if strings.HasPrefix(r.URL.Path, "/file/") {
 				http.ServeContent(w, r, "", time.Time{}, bytes.NewReader(f.enc))
@@ -680,5 +687,31 @@ func TestPlayerWaveKeepsCurrentTrack(t *testing.T) {
 	ev := log.wait(t, "player", playing("1", "play"))
 	if ev["wave"] != true {
 		t.Errorf("после текущего трека не волна: %v", ev)
+	}
+}
+
+func TestPlayerLyrics(t *testing.T) {
+	c, f, log := startPlayerCore(t)
+	send(c, map[string]any{"cmd": "lyrics", "track": "20"})
+	ev := log.wait(t, "lyrics", nil)
+	lines, _ := ev["lines"].([]any)
+	if ev["track"] != "20" || ev["synced"] != true || len(lines) != 2 || ev["error"] != nil {
+		t.Fatalf("текст = %v", ev)
+	}
+	if first, _ := lines[0].(map[string]any); first["ms"] != 1000.0 || first["text"] != "Раз" {
+		t.Errorf("первая строка = %v", lines[0])
+	}
+	send(c, map[string]any{"cmd": "lyrics", "track": "20"})
+	log.wait(t, "lyrics", nil)
+	send(c, map[string]any{"cmd": "lyrics", "track": "21"})
+	ev = log.wait(t, "lyrics", func(ev map[string]any) bool { return ev["track"] == "21" })
+	if lines, _ := ev["lines"].([]any); len(lines) != 0 || ev["error"] != nil {
+		t.Errorf("у трека без текста = %v", ev)
+	}
+	f.mu.Lock()
+	calls := f.lyricCalls
+	f.mu.Unlock()
+	if calls != 1 {
+		t.Errorf("запросов текста = %d, второй раз должен браться из памяти", calls)
 	}
 }

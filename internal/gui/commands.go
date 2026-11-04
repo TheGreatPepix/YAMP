@@ -145,6 +145,8 @@ func (g *App) onMessage(message string) {
 		g.setPresence(c)
 	case "like":
 		g.mark(c.Track, c.On, false, c.Position)
+	case "lyrics":
+		g.lyrics(strings.TrimSpace(c.Track))
 	case "dislike":
 		g.mark(c.Track, c.On, true, c.Position)
 	case "cancel":

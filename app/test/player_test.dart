@@ -696,6 +696,74 @@ void main() {
     await core.close();
   });
 
+  testWidgets('текст песни: строки по времени, перемотка по строке, обычный текст и его отсутствие', (tester) async {
+    final (core, c, engine) = await _open(tester);
+    c.player.play(fakePlaylist);
+    await _settle(tester);
+    c.player.panelOpen.value = true;
+    await _settle(tester);
+
+    await tester.tap(_panel(_tip('Текст песни')));
+    await _settle(tester);
+    expect(c.player.lyricsOpen.value, isTrue);
+    expect(find.text('Строка 1'), findsOneWidget);
+    expect(find.text('Авторы: Автор песни'), findsOneWidget);
+
+    engine.progress(const Duration(seconds: 31));
+    await _settle(tester);
+    expect(c.player.lyrics['1']!.lineAt(c.player.position.value), 2);
+    await tester.tap(find.text('Строка 6'));
+    await _settle(tester);
+    expect(engine.at, const Duration(seconds: 75));
+
+    await tester.tap(_panel(_tip('Следующий трек')));
+    await _settle(tester);
+    expect(c.player.track!.title, 'Кукушка');
+    expect(find.text('Строка 8'), findsOneWidget);
+    await tester.tap(find.text('Строка 2'));
+    await _settle(tester);
+    expect(engine.at, lessThan(const Duration(seconds: 5)));
+
+    await tester.tap(_panel(_tip('Следующий трек')));
+    await _settle(tester);
+    expect(find.text('Для этого трека нет текста'), findsOneWidget);
+
+    await tester.tap(_panel(_tip('Обложка и очередь')));
+    await _settle(tester);
+    expect(c.player.lyricsOpen.value, isFalse);
+    expect(find.text('Очередь'), findsOneWidget);
+    await core.close();
+  });
+
+  testWidgets('поделиться: трек из плеера и страница плейлиста копируют ссылку', (tester) async {
+    final (core, c, _) = await _open(tester);
+    final copied = <String>[];
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      if (call.method == 'Clipboard.setData') copied.add('${(call.arguments as Map)['text']}');
+      return null;
+    });
+    c.player.play(fakePlaylist);
+    await _settle(tester);
+    c.player.panelOpen.value = true;
+    await _settle(tester);
+    await tester.tap(_panel(_tip('Ещё')));
+    await _settle(tester);
+    await tester.tap(find.text('Поделиться треком'));
+    await tester.pump();
+    await tester.pump();
+    expect(copied, ['https://music.yandex.ru/album/9/track/1']);
+    expect(find.text('Ссылка скопирована'), findsOneWidget);
+
+    c.player.panelOpen.value = false;
+    c.openPage(fakePlaylist);
+    await _settle(tester);
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Поделиться'));
+    await tester.pump();
+    await tester.pump();
+    expect(copied.last, fakePlaylist);
+    await core.close();
+  });
+
   testWidgets('выход из аккаунта останавливает плеер', (tester) async {
     final (core, c, engine) = await _open(tester);
     await tester.tap(find.text('Моя волна'));
@@ -745,6 +813,14 @@ void main() {
           }
         }
       }
+      c.player.lyricsOpen.value = true;
+      for (var w = 320.0; w <= 1400; w += 40) {
+        for (final h in [560.0, 760.0]) {
+          tester.view.physicalSize = Size(w, h);
+          await tester.pumpAndSettle();
+        }
+      }
+      c.player.lyricsOpen.value = false;
       c.player.panelOpen.value = false;
       for (final page in [fakeArtist('Кино'), sourceHistory]) {
         c.openPage(page);

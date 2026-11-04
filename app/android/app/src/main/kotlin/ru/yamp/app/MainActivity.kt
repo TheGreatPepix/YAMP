@@ -60,6 +60,7 @@ class MainActivity : FlutterActivity() {
                 "metered" -> result.success(NetworkWatch.current(this))
                 "open" -> result.success(open(call.arguments as String))
                 "openFolder" -> result.success(openFolder(call.arguments as String))
+                "share" -> result.success(share(call.arguments as String))
                 "pickFolder" -> pickFolder(call.arguments as String?, result)
                 "storageGranted" -> result.success(storageGranted())
                 "requestStorage" -> {
@@ -73,6 +74,14 @@ class MainActivity : FlutterActivity() {
 
     private fun open(target: String): Boolean = try {
         startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(target)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        true
+    } catch (e: ActivityNotFoundException) {
+        false
+    }
+
+    private fun share(text: String): Boolean = try {
+        val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text)
+        startActivity(Intent.createChooser(send, null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         true
     } catch (e: ActivityNotFoundException) {
         false

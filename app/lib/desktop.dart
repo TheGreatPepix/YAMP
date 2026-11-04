@@ -98,6 +98,11 @@ class Desktop {
     return true;
   }
 
+  Future<bool> share(String text) async {
+    if (!Platform.isAndroid) return false;
+    return _androidCall('share', text);
+  }
+
   Future<bool> reveal(String file) async {
     if (Platform.isAndroid) return _androidCall('openFolder', file);
     if (Platform.isWindows) {

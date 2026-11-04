@@ -100,6 +100,7 @@ type playTrack struct {
 	Disliked    bool         `json:"disliked,omitempty"`
 	Unavailable bool         `json:"unavailable,omitempty"`
 	Link        string       `json:"link,omitempty"`
+	Lyrics      string       `json:"lyrics,omitempty"`
 }
 
 type playerEvent struct {
@@ -167,6 +168,7 @@ type playerState struct {
 	dislikes map[string]bool
 
 	lists    map[string]*trackList
+	lyrics   map[string]lyricsEvent
 	failures int
 	offline  bool
 	resumeAt float64
@@ -210,7 +212,7 @@ func (s *serial) run(f func()) {
 }
 
 func newPlayerState(cfg config) *playerState {
-	p := &playerState{likes: map[string]bool{}, dislikes: map[string]bool{}, lists: map[string]*trackList{}}
+	p := &playerState{likes: map[string]bool{}, dislikes: map[string]bool{}, lists: map[string]*trackList{}, lyrics: map[string]lyricsEvent{}}
 	p.queue.SetRepeat(player.ParseRepeat(cfg.Repeat))
 	p.queue.SetShuffle(cfg.Shuffle)
 	return p
@@ -220,7 +222,7 @@ func (p *playerState) shape(t yam.Track, cover string) playTrack {
 	pt := playTrack{
 		ID: t.ID, AlbumID: t.AlbumID, Title: t.Title, Artist: t.Artists, Artists: playArtists(t.ArtistRefs), Album: t.Album,
 		Cover: yam.CoverURL(t.Cover, cover), Duration: t.Duration, Explicit: t.Explicit,
-		Liked: p.likes[t.ID], Disliked: p.dislikes[t.ID], Unavailable: !t.Available,
+		Liked: p.likes[t.ID], Disliked: p.dislikes[t.ID], Unavailable: !t.Available, Lyrics: string(t.Lyrics),
 	}
 	switch {
 	case t.AlbumID != "":
@@ -281,6 +283,7 @@ func (g *App) playerReset() {
 	p.likesFor, p.liked = nil, nil
 	p.likes, p.dislikes = map[string]bool{}, map[string]bool{}
 	p.lists = map[string]*trackList{}
+	p.lyrics = map[string]lyricsEvent{}
 	p.mu.Unlock()
 	g.bindStream(nil)
 	g.emitPlayer(actStop)

@@ -57,6 +57,7 @@ class PlayTrack {
     this.disliked = false,
     this.unavailable = false,
     this.link = '',
+    this.lyrics = '',
   });
 
   factory PlayTrack.fromJson(Map<String, dynamic> j) => PlayTrack(
@@ -74,14 +75,55 @@ class PlayTrack {
     disliked: j['disliked'] == true,
     unavailable: j['unavailable'] == true,
     link: _s(j['link']),
+    lyrics: _s(j['lyrics']),
   );
 
-  final String id, albumId, title, artist, album, albumSource, cover, link;
+  final String id, albumId, title, artist, album, albumSource, cover, link, lyrics;
   final List<PlayArtist> artists;
   final int durationMs;
   final bool explicit, liked, disliked, unavailable;
 
   Duration get duration => Duration(milliseconds: durationMs);
+
+  bool get hasLyrics => lyrics != 'none';
+}
+
+class LyricLine {
+  const LyricLine(this.at, this.text);
+
+  final Duration? at;
+  final String text;
+}
+
+class Lyrics {
+  const Lyrics({
+    this.status = LoadStatus.loading,
+    this.synced = false,
+    this.lines = const [],
+    this.writers = const [],
+    this.error = '',
+  });
+
+  final LoadStatus status;
+  final bool synced;
+  final List<LyricLine> lines;
+  final List<String> writers;
+  final String error;
+
+  int lineAt(Duration position) {
+    if (!synced) return -1;
+    var lo = 0, hi = lines.length - 1, found = -1;
+    while (lo <= hi) {
+      final mid = (lo + hi) ~/ 2;
+      if (lines[mid].at! <= position) {
+        found = mid;
+        lo = mid + 1;
+      } else {
+        hi = mid - 1;
+      }
+    }
+    return found;
+  }
 }
 
 class PlaySource {
@@ -274,6 +316,8 @@ class PlayerState extends ChangeNotifier {
   final duration = ValueNotifier(Duration.zero);
 
   final panelOpen = ValueNotifier(false);
+  final lyricsOpen = ValueNotifier(false);
+  final lyrics = <String, Lyrics>{};
   final browse = ValueNotifier(sourceHome);
   final browsing = ValueNotifier(false);
   final _history = <String>[];
@@ -369,6 +413,23 @@ class PlayerState extends ChangeNotifier {
                   for (final p in (ev['likedPlaylists'] as List? ?? const []))
                     if (p is Map<String, dynamic>) LibraryPlaylist.fromJson(p),
                 ],
+              );
+      case 'lyrics':
+        final id = _s(ev['track']);
+        final error = _s(ev['error']);
+        if (lyrics.length > 40) lyrics.remove(lyrics.keys.first);
+        final synced = ev['synced'] == true;
+        lyrics[id] = error.isNotEmpty
+            ? Lyrics(status: LoadStatus.error, error: error)
+            : Lyrics(
+                status: LoadStatus.ok,
+                synced: synced,
+                lines: [
+                  for (final l in (ev['lines'] as List? ?? const []))
+                    if (l is Map<String, dynamic>)
+                      LyricLine(synced ? Duration(milliseconds: _i(l['ms'])) : null, _s(l['text'])),
+                ],
+                writers: [for (final w in (ev['writers'] as List? ?? const [])) _s(w)],
               );
       case 'tracks':
         final source = _s(ev['source']);
@@ -559,6 +620,20 @@ class PlayerState extends ChangeNotifier {
 
   void Function(String message)? onBlocked;
 
+  void Function(String link)? onShare;
+
+  void share(String link) {
+    if (link.isNotEmpty) onShare?.call(link);
+  }
+
+  void loadLyrics(PlayTrack t, {bool force = false}) {
+    final known = lyrics[t.id];
+    if (!force && known != null && known.status != LoadStatus.error) return;
+    lyrics[t.id] = const Lyrics();
+    _send({'cmd': 'lyrics', 'track': t.id});
+    notifyListeners();
+  }
+
   String get unavailable {
     final e = engine;
     return e is UnavailableEngine ? e.reason : '';
@@ -735,6 +810,7 @@ class PlayerState extends ChangeNotifier {
     position.dispose();
     duration.dispose();
     panelOpen.dispose();
+    lyricsOpen.dispose();
     browse.dispose();
     browsing.dispose();
     engine.dispose();

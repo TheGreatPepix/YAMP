@@ -189,6 +189,9 @@ class _SectionBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return NavigationBar(
       height: 64,
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
       selectedIndex: c.section.value.index,
       labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
       onDestinationSelected: (i) => switch (Section.values[i]) {

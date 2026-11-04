@@ -19,6 +19,7 @@ class Controller extends ChangeNotifier {
       player = PlayerState(core.send, engine ?? SilentEngine()) {
     _sub = core.events.listen(_receive);
     player.onBlocked = (message) => _notices.add(Notice(message, kind: NoticeKind.error));
+    player.onShare = share;
     player.panelOpen.addListener(() {
       if (player.panelOpen.value) downloadsOpen.value = false;
     });
@@ -296,6 +297,12 @@ class Controller extends ChangeNotifier {
     if (!await desktop.open(path)) _folderMissing(path);
   }
 
+  Future<void> share(String link) async {
+    if (link.isEmpty || await desktop.share(link)) return;
+    await Clipboard.setData(ClipboardData(text: link));
+    _notices.add(const Notice('Ссылка скопирована', kind: NoticeKind.ok));
+  }
+
   Future<void> reveal(String file) async {
     if (!await desktop.reveal(file)) _folderMissing(file);
   }
@@ -362,7 +369,7 @@ class Controller extends ChangeNotifier {
 
   void _receive(Event ev) {
     switch (ev['type']) {
-      case 'player' || 'queue' || 'playerFormat' || 'mark' || 'library' || 'home' || 'tracks':
+      case 'player' || 'queue' || 'playerFormat' || 'mark' || 'library' || 'home' || 'tracks' || 'lyrics':
         player.receive(ev);
         return;
       case 'state':

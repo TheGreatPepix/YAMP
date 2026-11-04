@@ -64,6 +64,7 @@ class FakePlayer {
       'disliked': _dislikes.contains(tid),
       if (i == 7) 'unavailable': true,
       'link': 'https://music.yandex.ru/album/9/track/$tid',
+      'lyrics': const ['sync', 'text', 'none'][i % 3],
     };
   }
 
@@ -336,6 +337,23 @@ class FakePlayer {
         }
         emitPlayer('play');
         emitQueue();
+      case 'lyrics':
+        final id = '$track';
+        final known = [..._queue, for (var i = 0; i < _songs.length; i++) _track(i)];
+        final kind = known.firstWhere((t) => t['id'] == id, orElse: () => const {})['lyrics'];
+        _later(const Duration(milliseconds: 100), () {
+          _emit({
+            'type': 'lyrics',
+            'track': id,
+            'synced': kind == 'sync',
+            'lines': switch (kind) {
+              'sync' => [for (var n = 0; n < 12; n++) {'ms': n * 15000, 'text': n % 4 == 3 ? '' : 'Строка ${n + 1}'}],
+              'text' => [for (var n = 0; n < 8; n++) {'ms': -1, 'text': 'Строка ${n + 1}'}],
+              _ => const [],
+            },
+            if (kind != 'none') 'writers': ['Автор песни'],
+          });
+        });
       case 'playerStarted':
         started.add('$track');
         _failures = 0;

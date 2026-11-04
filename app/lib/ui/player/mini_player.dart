@@ -143,6 +143,7 @@ class _Desktop extends StatelessWidget {
                           onOpen: onOpen,
                           onDownload: onDownload,
                           onWave: () => p.playWave(track: t),
+                          onShare: p.share,
                         ),
                     ],
                   ],
@@ -222,42 +223,40 @@ class _Phone extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final t = p.track;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-      child: Material(
-        color: scheme.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(14),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ExcludeSemantics(
-              child: ListenableBuilder(
-                listenable: Listenable.merge([p.position, p.duration]),
-                builder: (context, _) {
-                  final total = p.duration.value.inMilliseconds;
-                  return LinearProgressIndicator(
-                    value: total > 0 ? (p.position.value.inMilliseconds / total).clamp(0.0, 1.0) : 0,
-                    minHeight: 2,
-                    borderRadius: BorderRadius.zero,
-                    color: context.status.accent,
-                  );
-                },
-              ),
+    return Material(
+      color: scheme.surfaceContainer,
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ExcludeSemantics(
+            child: ListenableBuilder(
+              listenable: Listenable.merge([p.position, p.duration]),
+              builder: (context, _) {
+                final total = p.duration.value.inMilliseconds;
+                return LinearProgressIndicator(
+                  value: total > 0 ? (p.position.value.inMilliseconds / total).clamp(0.0, 1.0) : 0,
+                  minHeight: 2,
+                  borderRadius: BorderRadius.zero,
+                  color: context.status.accent,
+                );
+              },
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(4, 4, 6, 4),
-              child: Row(
-                children: [
-                  Expanded(child: _NowTitle(p: p, size: 40)),
-                  if (t != null) LikeButton(p: p, track: t),
-                  PlayPauseButton(p: p, size: 40),
-                ],
-              ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 6, 6, 6),
+            child: Row(
+              children: [
+                Expanded(child: _NowTitle(p: p, size: 42)),
+                SkipButton(p: p, forward: false, size: 44),
+                PlayPauseButton(p: p, size: 44),
+                SkipButton(p: p, forward: true, size: 44),
+              ],
             ),
-          ],
-        ),
+          ),
+          Divider(height: 1, indent: 12, endIndent: 12, color: scheme.outlineVariant),
+        ],
       ),
     );
   }

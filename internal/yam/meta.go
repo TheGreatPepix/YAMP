@@ -28,6 +28,7 @@ type Track struct {
 	Duration    int
 	Available   bool
 	Explicit    bool
+	Lyrics      LyricsKind
 }
 
 type ArtistRef struct {
@@ -74,18 +75,19 @@ type apiAlbum struct {
 }
 
 type apiTrack struct {
-	ID        flexID      `json:"id"`
-	RealID    flexID      `json:"realId"`
-	Title     string      `json:"title"`
-	Version   string      `json:"version"`
-	Available *bool       `json:"available"`
-	CoverURI  string      `json:"coverUri"`
-	Artists   []apiArtist `json:"artists"`
-	Albums    []apiAlbum  `json:"albums"`
-	Warning   string      `json:"contentWarning"`
-	Explicit  bool        `json:"explicit"`
-	Duration  int         `json:"durationMs"`
-	Source    string      `json:"trackSource"`
+	ID        flexID         `json:"id"`
+	RealID    flexID         `json:"realId"`
+	Title     string         `json:"title"`
+	Version   string         `json:"version"`
+	Available *bool          `json:"available"`
+	CoverURI  string         `json:"coverUri"`
+	Artists   []apiArtist    `json:"artists"`
+	Albums    []apiAlbum     `json:"albums"`
+	Warning   string         `json:"contentWarning"`
+	Explicit  bool           `json:"explicit"`
+	Duration  int            `json:"durationMs"`
+	Source    string         `json:"trackSource"`
+	Lyrics    *apiLyricsInfo `json:"lyricsInfo"`
 }
 
 var uploadExts = []string{".mp3", ".flac", ".m4a", ".aac", ".ogg", ".opus", ".wav"}
@@ -185,6 +187,7 @@ func (t apiTrack) shape(album *apiAlbum) Track {
 		Duration:    t.Duration,
 		Available:   t.Available == nil || *t.Available,
 		Explicit:    t.Explicit || t.Warning == "explicit",
+		Lyrics:      t.Lyrics.kind(),
 	}
 	if tr.Cover == "" {
 		tr.Cover = album.CoverURI
