@@ -306,6 +306,8 @@ class PlayerState extends ChangeNotifier {
 
   String? _startedFor;
   String? _announced;
+  Duration? _pending;
+  var _reported = Duration.zero;
   String? _failedFor;
   var _openedAt = Duration.zero;
   var _volumeApplied = false;
@@ -414,6 +416,7 @@ class PlayerState extends ChangeNotifier {
     }
 
     final current = track;
+    if (const {'play', 'resume', 'retry', 'stop', 'restore'}.contains(ev['action'])) _pending = null;
     switch (ev['action']) {
       case 'play' when current != null:
         _startedFor = null;
@@ -427,6 +430,15 @@ class PlayerState extends ChangeNotifier {
         _failedFor = null;
         _openedAt = position.value;
         engine.open(url, start: position.value, play: playing, hint: current.duration);
+      case 'restore' when current != null:
+        final at = Duration(milliseconds: (((ev['start'] as num?) ?? 0) * 1000).round());
+        _startedFor = null;
+        _announced = null;
+        _failedFor = null;
+        _pending = at;
+        _reported = at;
+        position.value = at;
+        duration.value = current.duration;
       case 'retry' when current != null:
         final at = Duration(milliseconds: (((ev['start'] as num?) ?? 0) * 1000).round());
         _startedFor = null;
@@ -449,12 +461,26 @@ class PlayerState extends ChangeNotifier {
     if (playing != v) {
       playing = v;
       notifyListeners();
+      if (!v) savePosition();
     }
+  }
+
+  static const _reportEvery = Duration(seconds: 10);
+
+  void savePosition() {
+    final id = track?.id;
+    if (id == null || _pending != null) return;
+    _reported = position.value;
+    _send({'cmd': 'playerPosition', 'track': id, 'position': _seconds, 'on': true});
   }
 
   void _onPosition(Duration p) {
     position.value = p;
     final id = track?.id;
+    if (id != null && playing && (p - _reported).abs() >= _reportEvery) {
+      _reported = p;
+      _send({'cmd': 'playerPosition', 'track': id, 'position': _seconds});
+    }
     if (id == null || _startedFor == id) return;
     if (p > _openedAt && p < _openedAt + const Duration(seconds: 3)) {
       _startedFor = id;
@@ -509,11 +535,23 @@ class PlayerState extends ChangeNotifier {
       play(sourceWave);
       return;
     }
+    if (_openPending()) return;
     playing ? engine.pause() : engine.play();
   }
 
+  bool _openPending() {
+    final at = _pending;
+    final current = track;
+    if (at == null || current == null) return false;
+    _pending = null;
+    _openedAt = at;
+    engine.open(url, start: at, hint: current.duration);
+    return true;
+  }
+
   void resume() {
-    if (track != null && !playing) engine.play();
+    if (track == null || playing || _blocked()) return;
+    if (!_openPending()) engine.play();
   }
 
   void pause() {
@@ -534,6 +572,10 @@ class PlayerState extends ChangeNotifier {
 
   void seek(Duration to) {
     position.value = to;
+    if (_pending != null) {
+      _pending = to;
+      return;
+    }
     engine.seek(to);
   }
 

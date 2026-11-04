@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -215,6 +216,10 @@ func startPlayerCore(t *testing.T) (*Core, *fakeMusic, *eventLog) {
 	t.Cleanup(func() {
 		c.Close()
 		c.Wait()
+		time.Sleep(50 * time.Millisecond)
+		done := make(chan struct{})
+		c.app.player.saves.run(func() { close(done) })
+		<-done
 	})
 	return c, f, log
 }
@@ -535,5 +540,75 @@ func TestPlayerWaveFromSource(t *testing.T) {
 	want := []string{"album:9|", "playlist:me_1001|", "track:21|", "track:22|", "track:22|20:9,21:9,22:9"}
 	if got := f.waveSeeds(); strings.Join(got, " ") != strings.Join(want, " ") {
 		t.Errorf("сиды = %v", got)
+	}
+}
+
+func TestPlayerResume(t *testing.T) {
+	c, _, log := startPlayerCore(t)
+	link := "https://music.yandex.ru/users/me/playlists/1001"
+
+	send(c, map[string]any{"cmd": "play", "source": link, "track": "21"})
+	log.wait(t, "player", playing("21", "play"))
+	send(c, map[string]any{"cmd": "playerPosition", "track": "21", "position": 33.5, "on": true})
+
+	deadline := time.Now().Add(3 * time.Second)
+	for {
+		b, _ := os.ReadFile(resumePath())
+		var s savedPlayer
+		if json.Unmarshal(b, &s) == nil && s.Position == 33.5 {
+			if len(s.Tracks) != 3 || s.Pos != 1 || s.Source == nil || s.Source.Title != "Дорога" {
+				t.Fatalf("сохранено %+v", s)
+			}
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("место не сохранилось: %s", b)
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+
+	p := c.app.player
+	p.mu.Lock()
+	p.queue.Clear()
+	p.source, p.restored = nil, false
+	p.mu.Unlock()
+	c.app.restorePlayer()
+	ev := log.wait(t, "player", playing("21", "restore"))
+	if ev["start"] != 33.5 || ev["source"].(map[string]any)["title"] != "Дорога" || ev["url"] == "" {
+		t.Errorf("восстановление = %v", ev)
+	}
+	if next, _ := ev["next"].(map[string]any); next == nil || next["id"] != "22" {
+		t.Errorf("следующий после восстановления = %v", ev["next"])
+	}
+
+	send(c, map[string]any{"cmd": "logout"})
+	log.wait(t, "player", func(ev map[string]any) bool { return ev["action"] == "stop" })
+	deadline = time.Now().Add(3 * time.Second)
+	for {
+		if _, err := os.Stat(resumePath()); os.IsNotExist(err) {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("после выхода место не забыто")
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+}
+
+func TestPlayerResumeWave(t *testing.T) {
+	c, f, log := startPlayerCore(t)
+	tracks := []yam.Track{{ID: "7", Title: "T7", Available: true}, {ID: "8", Title: "T8", Available: true}}
+	if err := writeResume(savedPlayer{Tracks: tracks, Pos: 1, Position: 7, Wave: true, Seeds: []string{"track:9"}}); err != nil {
+		t.Fatal(err)
+	}
+	c.app.restorePlayer()
+	ev := log.wait(t, "player", playing("8", "restore"))
+	if ev["wave"] != true {
+		t.Errorf("волна не восстановилась: %v", ev)
+	}
+	send(c, map[string]any{"cmd": "playerEnded", "track": "8", "position": 200})
+	log.wait(t, "player", playing("1", "play"))
+	if got := f.waveSeeds(); len(got) != 1 || got[0] != "track:9|7,8" {
+		t.Errorf("волна после восстановления = %v", got)
 	}
 }

@@ -29,6 +29,7 @@ class _YmdAppState extends State<YmdApp> {
   StreamSubscription<void>? _exits;
   var _offerPending = false;
   var _askingExit = false;
+  late final AppLifecycleListener _lifecycle;
 
   Controller get c => widget.controller;
 
@@ -42,6 +43,7 @@ class _YmdAppState extends State<YmdApp> {
     });
     _exits = c.exitRequests.listen((_) => _confirmExit());
     c.addListener(_offerUpdate);
+    _lifecycle = AppLifecycleListener(onHide: c.player.savePosition, onDetach: c.player.savePosition);
     c.start();
   }
 
@@ -72,6 +74,7 @@ class _YmdAppState extends State<YmdApp> {
   @override
   void dispose() {
     c.removeListener(_offerUpdate);
+    _lifecycle.dispose();
     _notices?.cancel();
     _offers?.cancel();
     _exits?.cancel();

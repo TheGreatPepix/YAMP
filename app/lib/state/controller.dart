@@ -93,6 +93,7 @@ class Controller extends ChangeNotifier {
   }
 
   void quit() {
+    player.savePosition();
     if (fatal != null) {
       desktop.quit();
     } else {

@@ -169,8 +169,12 @@ type playerState struct {
 	failures int
 	offline  bool
 	resumeAt float64
+	position float64
+	savedAt  time.Time
+	restored bool
 
 	reports serial
+	saves   serial
 }
 
 type serial struct {
@@ -686,7 +690,7 @@ func (g *App) waveRefill(sess *yam.Session) {
 	p := g.player
 	p.mu.Lock()
 	w := p.wave
-	if w == nil || w.loading || w.session == "" || p.queue.Remaining() >= waveLow {
+	if w == nil || w.loading || p.queue.Remaining() >= waveLow {
 		p.mu.Unlock()
 		return
 	}
@@ -702,9 +706,17 @@ func (g *App) waveRefill(sess *yam.Session) {
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		batch, err := sess.WaveNext(ctx, session, known)
-		if errors.Is(err, yam.ErrWaveEnded) {
+		var batch yam.WaveBatch
+		var err error
+		if session != "" {
+			batch, err = sess.WaveNext(ctx, session, known)
+		}
+		if session == "" || errors.Is(err, yam.ErrWaveEnded) {
 			batch, err = sess.WaveStart(ctx, seeds, known)
+			if err == nil {
+				b := batch
+				p.reports.run(func() { g.waveFeedback(sess, b.Session, b.Batch, yam.WaveStarted, "", 0) })
+			}
 		}
 		p.mu.Lock()
 		if seq != p.seq || p.wave != w {
@@ -1107,7 +1119,13 @@ func (g *App) emitPlayer(action string) {
 		Repeat: string(p.queue.Repeat()), Shuffle: p.queue.Shuffle(), Quality: string(q), Volume: vol,
 		Wave: p.wave != nil, Loading: p.offline || (p.wave != nil && p.wave.pending), Offline: p.offline,
 	}
-	if action == actRetry {
+	switch action {
+	case actPlay:
+		p.position = 0
+	case actRetry:
+		p.position = p.resumeAt
+		ev.Start = p.resumeAt
+	case actRestore:
 		ev.Start = p.resumeAt
 	}
 	if p.source != nil {
@@ -1128,12 +1146,13 @@ func (g *App) emitPlayer(action string) {
 	p.mu.Unlock()
 
 	if ev.Track == nil {
-		if action == actPlay || action == actResume || action == actRetry {
+		if action == actPlay || action == actResume || action == actRetry || action == actRestore {
 			ev.Action = actStop
 		}
 		g.emit(ev)
 		return
 	}
+	g.persist()
 	var err error
 	if ev.URL, err = g.stream.url(cur.ID, q); err != nil {
 		g.notice("Не удалось запустить плеер: "+err.Error(), "error")

@@ -238,6 +238,39 @@ void main() {
     expect(sent.last, containsPair('cmd', 'playerEnded'));
   });
 
+  test('после перезапуска трек ждёт на том же месте и сохраняет позицию', () {
+    final sent = <Map<String, Object?>>[];
+    final engine = SilentEngine();
+    final p = PlayerState(sent.add, engine);
+    p.receive({
+      'type': 'player',
+      'action': 'restore',
+      'url': 'http://127.0.0.1/5',
+      'start': 33.5,
+      'track': {'id': '5', 'title': 'Песня', 'durationMs': 180000},
+    });
+    expect(engine.url, isNull);
+    expect(p.position.value, const Duration(milliseconds: 33500));
+    expect(p.duration.value, const Duration(minutes: 3));
+
+    p.seek(const Duration(seconds: 40));
+    expect(engine.url, isNull);
+    p.togglePlay();
+    expect(engine.url, 'http://127.0.0.1/5');
+    expect(engine.at, const Duration(seconds: 40));
+    expect(engine.isPlaying, isTrue);
+
+    engine.progress(const Duration(seconds: 1));
+    expect(sent.where((c) => c['cmd'] == 'playerStarted'), hasLength(1));
+    engine.progress(const Duration(seconds: 10));
+    expect(sent.last, containsPair('cmd', 'playerPosition'));
+    expect(sent.last, containsPair('position', 51.0));
+
+    p.pause();
+    expect(sent.last, containsPair('cmd', 'playerPosition'));
+    expect(sent.last, containsPair('on', true));
+  });
+
   test('дни истории подписаны по-русски', () {
     final now = DateTime(2026, 11, 4, 0, 30);
     expect(dayLabel('2026-11-04', now), 'Сегодня');

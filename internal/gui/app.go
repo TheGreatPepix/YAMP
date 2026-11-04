@@ -11,7 +11,7 @@ import (
 	"yamp/internal/yam"
 )
 
-const Version = "0.1.1"
+const Version = "0.1.2"
 
 const (
 	accNone     = "none"
@@ -148,6 +148,9 @@ func (g *App) checkAccount(token string, save bool) {
 			g.revoke(revoke)
 		}
 		g.setAccount(ev)
+		if err == nil {
+			g.restorePlayer()
+		}
 		if saveErr != nil {
 			g.notice("Не удалось сохранить токен: "+saveErr.Error(), "error")
 		}
@@ -201,6 +204,7 @@ func (g *App) logout() {
 		g.revoke(revoke)
 	}
 	g.playerReset()
+	g.forgetResume()
 	g.setAccount(accountEvent{Status: accNone})
 }
 

@@ -57,6 +57,12 @@ func (q *Queue) Set(tracks []yam.Track, start int) {
 	q.pos = start
 }
 
+func (q *Queue) Restore(tracks []yam.Track, pos int, shuffle bool) {
+	q.shuffle = false
+	q.Set(tracks, pos)
+	q.shuffle = shuffle
+}
+
 func (q *Queue) reshuffle(first int) {
 	rest := make([]int, 0, len(q.tracks))
 	for i := range q.tracks {

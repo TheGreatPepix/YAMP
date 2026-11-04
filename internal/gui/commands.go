@@ -127,6 +127,8 @@ func (g *App) onMessage(message string) {
 		g.setRepeat(c.Repeat)
 	case "playerShuffle":
 		g.setShuffle(c.On)
+	case "playerPosition":
+		g.playerPosition(c.Track, c.Position, c.On)
 	case "playerState":
 		g.emitPlayer("")
 	case "queue":
@@ -144,6 +146,7 @@ func (g *App) onMessage(message string) {
 	case "remove":
 		g.jobs.remove(c.ID)
 	case "exit":
+		g.flushResume()
 		g.jobs.cancel(0)
 		g.host.post(g.host.exit)
 	}

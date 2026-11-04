@@ -56,14 +56,14 @@ jobs:
         working-directory: dist
         run: 7z a -tzip YAMP-windows.zip YAMP > /dev/null
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: YAMP-windows
           path: dist/YAMP
 
       - name: Release
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: dist/YAMP-windows.zip
 
@@ -107,6 +107,9 @@ jobs:
           cp dist-core/ymcore "$appdir/usr/bin/"
           cp app/linux/packaging/yamp.png "$appdir/usr/bin/data/yamp.png"
           cp app/linux/packaging/yamp.desktop "$appdir/yamp.desktop"
+          mkdir -p "$appdir/usr/share/metainfo" "$appdir/usr/share/applications"
+          cp app/linux/packaging/yamp.desktop "$appdir/usr/share/applications/yamp.desktop"
+          cp app/linux/packaging/yamp.appdata.xml "$appdir/usr/share/metainfo/yamp.appdata.xml"
           cp app/linux/packaging/yamp.png "$appdir/yamp.png"
           cp app/linux/packaging/yamp.png "$appdir/.DirIcon"
           cat > "$appdir/AppRun" <<'EOF'
@@ -120,14 +123,14 @@ jobs:
           chmod +x appimagetool
           ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 ./appimagetool "$appdir" dist/YAMP-linux-x86_64.AppImage
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: YAMP-linux
           path: dist/YAMP-linux-x86_64.AppImage
 
       - name: Release
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: dist/YAMP-linux-x86_64.AppImage
 
@@ -170,19 +173,19 @@ jobs:
           ln -s /Applications dist/dmg/Applications
           hdiutil create -volname YAMP -srcfolder dist/dmg -ov -format UDZO dist/YAMP-macos.dmg
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: YAMP-macos
           path: dist/YAMP-macos.dmg
 
       - name: Release
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: dist/YAMP-macos.dmg
 
   android:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
 
@@ -216,14 +219,15 @@ jobs:
         env:
           KEYSTORE: ${{ secrets.ANDROID_KEYSTORE }}
           PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
         run: |
           if [ -z "$KEYSTORE" ]; then
             echo "::warning::нет ANDROID_KEYSTORE, APK подписан отладочным ключом"
             exit 0
           fi
           echo "$KEYSTORE" | base64 -d > "$RUNNER_TEMP/yamp-release.jks"
-          printf 'storeFile=%s\nstorePassword=%s\nkeyPassword=%s\nkeyAlias=yamp\n' \
-            "$RUNNER_TEMP/yamp-release.jks" "$PASSWORD" "$PASSWORD" > app/android/key.properties
+          printf 'storeFile=%s\nstorePassword=%s\nkeyPassword=%s\nkeyAlias=%s\n' \
+            "$RUNNER_TEMP/yamp-release.jks" "$PASSWORD" "$PASSWORD" "${ALIAS:-yamp}" > app/android/key.properties
 
       - name: Build
         working-directory: app
@@ -236,13 +240,13 @@ jobs:
           cp "$out/app-armeabi-v7a-release.apk" ../dist/YAMP-android-arm.apk
           cp "$out/app-x86_64-release.apk" ../dist/YAMP-android-x86_64.apk
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: YAMP-android
           path: dist/*.apk
 
       - name: Release
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: dist/*.apk
