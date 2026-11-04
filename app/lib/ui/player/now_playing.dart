@@ -58,29 +58,52 @@ class NowPlaying extends StatelessWidget {
             final wide = !phone && box.maxWidth >= _wideFrom;
             final side = phone ? 16.0 : 24.0;
             if (!wide) {
+              final cover = ((box.maxWidth - 2 * side).clamp(0.0, 560.0) * (phone ? 1 : 0.62)).clamp(120.0, 360.0);
               return SingleChildScrollView(
                 padding: EdgeInsets.symmetric(horizontal: side),
-                child: ListenableBuilder(
-                  listenable: p,
-                  builder: (context, _) {
-                    final t = p.track;
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _Header(p: p, onClose: _close, onOpen: onOpen, onQueue: () => _openQueue(context)),
-                        if (t == null)
-                          const _Waiting()
-                        else
-                          Center(
-                            child: ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 560),
-                              child: _Main(p: p, track: t, phone: phone, onOpen: onOpen, onDownload: onDownload),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: box.maxHeight),
+                  child: ListenableBuilder(
+                    listenable: p,
+                    builder: (context, _) {
+                      final t = p.track;
+                      return Column(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _Header(p: p, onClose: _close, onOpen: onOpen, onQueue: () => _openQueue(context)),
+                          if (t == null)
+                            const _Waiting()
+                          else ...[
+                            Center(
+                              child: Cover(
+                                url: p.art.isNotEmpty ? p.art : t.cover,
+                                size: cover,
+                                radius: 16,
+                                kind: ReleaseKind.track,
+                              ),
                             ),
-                          ),
-                        const SizedBox(height: 24),
-                      ],
-                    );
-                  },
+                            Center(
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(maxWidth: 560),
+                                child: Padding(
+                                  padding: const EdgeInsets.only(bottom: 24),
+                                  child: _Main(
+                                    p: p,
+                                    track: t,
+                                    phone: phone,
+                                    onOpen: onOpen,
+                                    onDownload: onDownload,
+                                    cover: false,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      );
+                    },
+                  ),
                 ),
               );
             }
@@ -112,7 +135,14 @@ class NowPlaying extends StatelessWidget {
                                         final t = p.track;
                                         return t == null
                                             ? const _Waiting()
-                                            : _Main(p: p, track: t, phone: false, art: art, onOpen: onOpen, onDownload: onDownload);
+                                            : _Main(
+                                                p: p,
+                                                track: t,
+                                                phone: false,
+                                                art: art,
+                                                onOpen: onOpen,
+                                                onDownload: onDownload,
+                                              );
                                       },
                                     ),
                                   ),
@@ -169,7 +199,9 @@ class _QueueFlyout extends StatelessWidget {
             left: false,
             child: Stack(
               children: [
-                FocusTraversalGroup(child: _QueueScroll(p: p, side: 12, top: 22, onOpen: onOpen)),
+                FocusTraversalGroup(
+                  child: _QueueScroll(p: p, side: 12, top: 22, onOpen: onOpen),
+                ),
                 Positioned(
                   top: 8,
                   right: 8,
@@ -400,6 +432,7 @@ class _Main extends StatelessWidget {
     required this.onOpen,
     this.onDownload,
     this.art,
+    this.cover = true,
   });
 
   final PlayerState p;
@@ -408,6 +441,7 @@ class _Main extends StatelessWidget {
   final OpenPage onOpen;
   final Download? onDownload;
   final double? art;
+  final bool cover;
 
   @override
   Widget build(BuildContext context) {
@@ -417,15 +451,17 @@ class _Main extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Center(
-              child: Cover(
-                url: p.art.isNotEmpty ? p.art : track.cover,
-                size: size,
-                radius: 16,
-                kind: ReleaseKind.track,
+            if (cover) ...[
+              Center(
+                child: Cover(
+                  url: p.art.isNotEmpty ? p.art : track.cover,
+                  size: size,
+                  radius: 16,
+                  kind: ReleaseKind.track,
+                ),
               ),
-            ),
-            const SizedBox(height: 20),
+              const SizedBox(height: 20),
+            ],
             Row(
               children: [
                 Expanded(
@@ -437,12 +473,7 @@ class _Main extends StatelessWidget {
                 if (p.wave) DislikeButton(p: p, track: track, size: 44),
                 LikeButton(p: p, track: track, size: 44),
                 if (onDownload != null)
-                  DownloadButton(
-                    download: onDownload!,
-                    link: track.link,
-                    title: track.title,
-                    size: 44,
-                  ),
+                  DownloadButton(download: onDownload!, link: track.link, title: track.title, size: 44),
                 _PageMenu(track: track, onOpen: onOpen),
               ],
             ),
