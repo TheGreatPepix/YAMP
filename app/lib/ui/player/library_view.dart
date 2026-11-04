@@ -8,6 +8,7 @@ import '../download_menu.dart';
 import '../widgets.dart';
 import 'artist_view.dart';
 import 'controls.dart';
+import 'history_view.dart';
 import 'home_view.dart';
 
 class LibraryView extends StatefulWidget {
@@ -143,6 +144,12 @@ class LibraryList extends StatelessWidget {
               subtitle: lib.status == LoadStatus.ok || p.likedCount > 0 ? tracksCount(p.likedCount) : null,
               selected: selected == sourceLiked,
               onTap: () => onOpen(sourceLiked),
+            ),
+            _SourceTile(
+              icon: Icons.history_rounded,
+              title: 'История',
+              selected: selected == sourceHistory,
+              onTap: () => onOpen(sourceHistory),
             ),
             if (lib.status == LoadStatus.loading || lib.status == LoadStatus.idle)
               const Padding(
@@ -422,6 +429,7 @@ class TrackListView extends StatelessWidget {
           );
         }
         final liked = source == sourceLiked;
+        final history = source == sourceHistory;
         final tracks = list.tracks;
         final albums = list.albums;
         if (tracks.isEmpty && albums.isEmpty) {
@@ -432,7 +440,9 @@ class TrackListView extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
-                    liked ? Icons.favorite_border_rounded : Icons.queue_music_rounded,
+                    liked
+                        ? Icons.favorite_border_rounded
+                        : (history ? Icons.history_rounded : Icons.queue_music_rounded),
                     size: 40,
                     color: scheme.onSurfaceVariant,
                   ),
@@ -440,6 +450,8 @@ class TrackListView extends StatelessWidget {
                   Text(
                     liked
                         ? 'Здесь будут ваши любимые треки'
+                        : history
+                        ? 'История пока пуста'
                         : (list.info?.kind == 'playlist'
                               ? 'В этом плейлисте пока нет треков'
                               : 'Здесь пока нет треков'),
@@ -449,6 +461,8 @@ class TrackListView extends StatelessWidget {
                   Text(
                     liked
                         ? 'Отмечайте треки сердцем, и они появятся здесь.'
+                        : history
+                        ? 'Слушайте музыку, и треки появятся здесь по дням.'
                         : 'Добавьте треки в Яндекс Музыке, и они появятся здесь.',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: scheme.onSurfaceVariant),
@@ -464,6 +478,7 @@ class TrackListView extends StatelessWidget {
             ),
           );
         }
+        if (history) return HistoryView(c: c, list: list, phone: phone);
         if (list.info?.kind == 'artist' && !isTopTracks(source)) {
           return ArtistView(c: c, source: source, list: list, phone: phone);
         }
@@ -517,6 +532,7 @@ class ListHeader extends StatelessWidget {
     final over = switch (kind) {
       sourceLiked => 'Коллекция',
       sourceChart => 'Чарт',
+      sourceHistory => 'Прослушивания',
       'album' => 'Альбом',
       'artist' when top => 'Популярные треки',
       'artist' => 'Исполнитель',
@@ -528,7 +544,7 @@ class ListHeader extends StatelessWidget {
     final rest = [
       if (kind == 'album' && (info?.year ?? 0) > 0) '${info!.year}',
       if (artist) releasesLabel(list.albums) else if (kind != 'track') tracksCount(list.tracks.length),
-      if (kind != 'artist' && list.total > Duration.zero) fmtTotal(list.total),
+      if (kind != 'artist' && kind != sourceHistory && list.total > Duration.zero) fmtTotal(list.total),
     ].where((s) => s.isNotEmpty).join(' · ');
     final lead = [
       if (byArtist && (info?.artist ?? '').isNotEmpty) ...artistParts(info!.artists, info.artist),
@@ -543,7 +559,12 @@ class ListHeader extends StatelessWidget {
       if (rest.isNotEmpty) LinkPart(rest),
     ];
     final size = kind == 'artist' ? (phone ? 96.0 : 168.0) : (phone ? 72.0 : 120.0);
-    final badge = liked ? Icons.favorite_rounded : (kind == sourceChart ? Icons.leaderboard_rounded : null);
+    final badge = switch (kind) {
+      sourceLiked => Icons.favorite_rounded,
+      sourceChart => Icons.leaderboard_rounded,
+      sourceHistory => Icons.history_rounded,
+      _ => null,
+    };
     final art = badge != null
         ? Container(
             width: phone ? 72 : 120,
@@ -634,7 +655,7 @@ class ListHeader extends StatelessWidget {
                 icon: const Icon(Icons.shuffle_rounded, size: 18),
                 label: const Text('Вперемешку'),
               ),
-              if (!top)
+              if (!top && kind != sourceHistory)
                 DownloadButton(
                   download: (link, q, name) => c.download(link, q, title: name),
                   link: liked ? sourceLiked : source,

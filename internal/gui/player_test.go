@@ -87,11 +87,13 @@ func newFakeMusic(t *testing.T) *fakeMusic {
 		case "/feed":
 			w.Write([]byte(`{"result":{"generatedPlaylists":[{"type":"playlistOfTheDay","ready":true,"data":{"uid":5,"kind":100,"title":"Плейлист дня","owner":{"login":"yamusic-daily"}}},{"type":"missedLikes","ready":false,"data":{"uid":5,"kind":101,"title":"Не готов"}}]}}`))
 		case "/music-history":
-			w.Write([]byte(`{"result":{"historyTabs":[{"items":[` +
-				`{"context":{"type":"album","data":{"fullModel":{"album":{"id":9,"title":"Al","artists":[{"name":"A"}]}}}}},` +
+			played := func(id string) string { return `{"type":"track","data":{"fullModel":` + track(id) + `}}` }
+			w.Write([]byte(`{"result":{"historyTabs":[{"date":"2026-11-04","items":[` +
+				`{"context":{"type":"album","data":{"fullModel":{"album":{"id":9,"title":"Al","artists":[{"name":"A"}]}}}},"tracks":[` + played("20") + `,` + played("21") + `]},` +
 				`{"context":{"type":"wave","data":{}}},` +
 				`{"context":{"type":"album","data":{"fullModel":{"album":{"id":9,"title":"Al"}}}}},` +
-				`{"context":{"type":"artist","data":{"fullModel":{"artist":{"id":3,"name":"A"}}}}}]}]}}`))
+				`{"context":{"type":"artist","data":{"fullModel":{"artist":{"id":3,"name":"A"}}}}}]},` +
+				`{"date":"2026-11-03","items":[{"context":{"type":"wave","data":{}},"tracks":[` + played("21") + `,` + played("22") + `]}]}]}}`))
 		case "/landing3/new-releases":
 			w.Write([]byte(`{"result":{"newReleases":[11,12]}}`))
 		case "/albums":
@@ -409,5 +411,35 @@ func TestHome(t *testing.T) {
 	src, _ := played["source"].(map[string]any)
 	if src["kind"] != "chart" || src["title"] != "Чарт" {
 		t.Errorf("источник = %v", played["source"])
+	}
+}
+
+func TestPlayerHistory(t *testing.T) {
+	c, _, log := startPlayerCore(t)
+
+	send(c, map[string]any{"cmd": "open", "source": "history"})
+	ev := log.wait(t, "tracks", func(m map[string]any) bool { return m["source"] == "history" })
+	if ev["error"] != nil {
+		t.Fatalf("история с ошибкой: %v", ev["error"])
+	}
+	var ids []string
+	for _, it := range ev["tracks"].([]any) {
+		ids = append(ids, fmt.Sprint(it.(map[string]any)["id"]))
+	}
+	if got := strings.Join(ids, ","); got != "20,21,21,22" {
+		t.Errorf("треки истории = %s", got)
+	}
+	days, _ := json.Marshal(ev["days"])
+	if string(days) != `[{"count":2,"date":"2026-11-04"},{"count":2,"date":"2026-11-03"}]` {
+		t.Errorf("дни = %s", days)
+	}
+	if info, _ := ev["info"].(map[string]any); info["kind"] != "history" || info["title"] != "История" {
+		t.Errorf("источник = %v", ev["info"])
+	}
+
+	send(c, map[string]any{"cmd": "play", "source": "history", "track": "21", "index": 2})
+	played := log.wait(t, "player", playing("21", "play"))
+	if played["pos"] != float64(2) {
+		t.Errorf("начали с позиции %v, ждали 2", played["pos"])
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -145,6 +146,93 @@ func (c *Client) History(ctx context.Context, limit int) ([]Hit, error) {
 			if len(out) == limit {
 				return out, nil
 			}
+		}
+	}
+	return out, nil
+}
+
+const historyModels = 1000
+
+type HistoryDay struct {
+	Date   string
+	Tracks []Track
+}
+
+func (c *Client) HistoryDays(ctx context.Context) ([]HistoryDay, error) {
+	var res struct {
+		HistoryTabs []struct {
+			Date  string `json:"date"`
+			Items []struct {
+				Tracks []struct {
+					Type string `json:"type"`
+					Data struct {
+						ItemID struct {
+							TrackID flexID `json:"trackId"`
+						} `json:"itemId"`
+						FullModel *apiTrack `json:"fullModel"`
+					} `json:"data"`
+				} `json:"tracks"`
+			} `json:"items"`
+		} `json:"historyTabs"`
+	}
+	path := "/music-history?fullModelsCount=" + strconv.Itoa(historyModels)
+	if err := c.api(ctx, http.MethodGet, path, nil, &res); err != nil {
+		return nil, err
+	}
+	var days []HistoryDay
+	known := map[string]Track{}
+	for _, tab := range res.HistoryTabs {
+		day := HistoryDay{Date: tab.Date}
+		seen := map[string]bool{}
+		for _, it := range tab.Items {
+			for _, t := range it.Tracks {
+				if t.Type != "" && t.Type != "track" {
+					continue
+				}
+				id := string(t.Data.ItemID.TrackID)
+				if t.Data.FullModel != nil {
+					tr := t.Data.FullModel.shape(nil)
+					id = tr.ID
+					if id != "" {
+						known[id] = tr
+					}
+				}
+				if id == "" || seen[id] {
+					continue
+				}
+				seen[id] = true
+				day.Tracks = append(day.Tracks, Track{ID: id})
+			}
+		}
+		days = append(days, day)
+	}
+	var missing []string
+	for _, d := range days {
+		for _, t := range d.Tracks {
+			if _, ok := known[t.ID]; !ok && !slices.Contains(missing, t.ID) {
+				missing = append(missing, t.ID)
+			}
+		}
+	}
+	if len(missing) > 0 {
+		found, err := c.Tracks(ctx, missing)
+		if err != nil {
+			return nil, err
+		}
+		for _, t := range found {
+			known[t.ID] = t
+		}
+	}
+	out := make([]HistoryDay, 0, len(days))
+	for _, d := range days {
+		day := HistoryDay{Date: d.Date}
+		for _, t := range d.Tracks {
+			if full, ok := known[t.ID]; ok {
+				day.Tracks = append(day.Tracks, full)
+			}
+		}
+		if len(day.Tracks) > 0 {
+			out = append(out, day)
 		}
 	}
 	return out, nil

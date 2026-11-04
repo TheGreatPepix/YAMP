@@ -7,7 +7,10 @@ import 'widgets.dart';
 import 'update_dialog.dart';
 
 Future<void> showSettingsDialog(BuildContext context, Controller c) {
-  return showDialog(context: context, builder: (_) => _SettingsDialog(c: c));
+  return showDialog(
+    context: context,
+    builder: (_) => _SettingsDialog(c: c),
+  );
 }
 
 class _SettingsDialog extends StatelessWidget {
@@ -99,10 +102,7 @@ class _SettingsDialog extends StatelessWidget {
                 Row(
                   children: [
                     const Expanded(child: _Label('Одновременных загрузок')),
-                    Text(
-                      '${c.concurrency}',
-                      style: text.titleMedium?.copyWith(color: context.status.accent),
-                    ),
+                    Text('${c.concurrency}', style: text.titleMedium?.copyWith(color: context.status.accent)),
                   ],
                 ),
                 Slider(
@@ -118,6 +118,16 @@ class _SettingsDialog extends StatelessWidget {
                   'Меняется на лету, без остановки загрузок.',
                 ),
                 const SizedBox(height: 22),
+                if (c.discordAvailable) ...[
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Показывать трек в Discord'),
+                    subtitle: const _Hint('Пока играет музыка, название и исполнитель видны в вашем статусе.'),
+                    value: c.discord,
+                    onChanged: c.setDiscord,
+                  ),
+                  const SizedBox(height: 22),
+                ],
                 const _Label('Тема'),
                 SegmentedButton<ThemeChoice>(
                   showSelectedIcon: false,

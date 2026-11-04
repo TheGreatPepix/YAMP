@@ -16,3 +16,7 @@ build/
 *.iml
 
 /app/android/app/libs/
+
+# Local builds
+/dist/
+/dist-core/

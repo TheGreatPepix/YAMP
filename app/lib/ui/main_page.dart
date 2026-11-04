@@ -5,6 +5,7 @@ import '../state/controller.dart';
 import 'downloads.dart';
 import 'link_input.dart';
 import 'log_dialog.dart';
+import 'player/compact_player.dart';
 import 'player/library_view.dart';
 import 'player/mini_player.dart';
 import 'player/now_playing.dart';
@@ -24,6 +25,26 @@ class MainPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return ValueListenableBuilder(
+      valueListenable: c.compact,
+      builder: (context, compact, page) => Stack(
+        fit: StackFit.expand,
+        children: [
+          Offstage(
+            offstage: compact,
+            child: TickerMode(
+              enabled: !compact,
+              child: ExcludeFocus(excluding: compact, child: page!),
+            ),
+          ),
+          if (compact) Positioned.fill(child: CompactPlayer(c: c)),
+        ],
+      ),
+      child: _full(context),
+    );
+  }
+
+  Widget _full(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       body: SafeArea(
@@ -72,7 +93,13 @@ class MainPage extends StatelessWidget {
                             Divider(height: 1, color: scheme.outlineVariant),
                             Expanded(child: body),
                             FocusTraversalGroup(
-                              child: MiniPlayer(p: c.player, phone: phone, onOpen: c.openPage),
+                              child: MiniPlayer(
+                                p: c.player,
+                                phone: phone,
+                                onOpen: c.openPage,
+                                onDownload: (link, q, title) => c.download(link, q, title: title),
+                                onCompact: c.canCompact ? () => c.setCompact(true) : null,
+                              ),
                             ),
                             if (phone) _SectionBar(c: c),
                           ],
@@ -90,6 +117,7 @@ class MainPage extends StatelessWidget {
                                   phone: phone,
                                   onOpen: c.openPage,
                                   onDownload: (link, q, title) => c.download(link, q, title: title),
+                                  onCompact: c.canCompact ? () => c.setCompact(true) : null,
                                 ),
                               ),
                             ),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../state/player.dart';
 import '../../theme.dart';
+import '../download_menu.dart';
 import '../widgets.dart';
 
 String fmtTime(Duration d) {
@@ -492,6 +493,32 @@ List<Widget> pageItems(PlayTrack t, OpenPage onOpen, {String here = ''}) => [
         child: Text(t.artists.length == 1 ? 'Перейти к исполнителю' : a.name),
       ),
 ];
+
+class TrackMenu extends StatelessWidget {
+  const TrackMenu({super.key, required this.track, required this.onOpen, this.onDownload, this.size});
+
+  final PlayTrack track;
+  final OpenPage onOpen;
+  final Download? onDownload;
+  final double? size;
+
+  @override
+  Widget build(BuildContext context) {
+    final pages = pageItems(track, onOpen);
+    final downloads = onDownload == null ? const <Widget>[] : downloadItems(onDownload!, track.link, track.title);
+    if (pages.isEmpty && downloads.isEmpty) return const SizedBox.shrink();
+    final box = size;
+    return MenuAnchor(
+      menuChildren: [...downloads, if (downloads.isNotEmpty && pages.isNotEmpty) const Divider(height: 8), ...pages],
+      builder: (context, menu, _) => IconButton(
+        tooltip: 'Ещё',
+        onPressed: () => menu.isOpen ? menu.close() : menu.open(),
+        style: box == null ? null : IconButton.styleFrom(fixedSize: Size.square(box), minimumSize: Size.square(box)),
+        icon: const Icon(Icons.more_vert_rounded),
+      ),
+    );
+  }
+}
 
 class TrackText extends StatelessWidget {
   const TrackText({

@@ -9,14 +9,23 @@ import 'controls.dart';
 
 const _rowExtent = 56.0;
 const _wideFrom = 900.0;
+const _controlsWidth = 560.0;
 
 class NowPlaying extends StatelessWidget {
-  const NowPlaying({super.key, required this.p, required this.phone, required this.onOpen, this.onDownload});
+  const NowPlaying({
+    super.key,
+    required this.p,
+    required this.phone,
+    required this.onOpen,
+    this.onDownload,
+    this.onCompact,
+  });
 
   final PlayerState p;
   final bool phone;
   final OpenPage onOpen;
   final Download? onDownload;
+  final VoidCallback? onCompact;
 
   void _close() => p.panelOpen.value = false;
 
@@ -107,13 +116,13 @@ class NowPlaying extends StatelessWidget {
                 ),
               );
             }
-            final queueWidth = (box.maxWidth * 0.36).clamp(320.0, 440.0);
+            final queueWidth = (box.maxWidth * 0.3).clamp(320.0, 560.0);
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Padding(
                   padding: EdgeInsets.symmetric(horizontal: side),
-                  child: _Header(p: p, onClose: _close, onOpen: onOpen),
+                  child: _Header(p: p, onClose: _close, onOpen: onOpen, onCompact: onCompact),
                 ),
                 Expanded(
                   child: Padding(
@@ -124,11 +133,11 @@ class NowPlaying extends StatelessWidget {
                         Expanded(
                           child: LayoutBuilder(
                             builder: (context, area) {
-                              final art = (area.maxHeight - 300).clamp(160.0, 480.0).clamp(0.0, area.maxWidth);
+                              final art = (area.maxHeight - 300).clamp(160.0, 720.0).clamp(0.0, area.maxWidth);
                               return Center(
                                 child: SingleChildScrollView(
                                   child: ConstrainedBox(
-                                    constraints: BoxConstraints(maxWidth: art.clamp(360.0, 560.0)),
+                                    constraints: BoxConstraints(maxWidth: art.clamp(360.0, 720.0)),
                                     child: ListenableBuilder(
                                       listenable: p,
                                       builder: (context, _) {
@@ -371,12 +380,13 @@ class _QueueScrollState extends State<_QueueScroll> {
 }
 
 class _Header extends StatelessWidget {
-  const _Header({required this.p, required this.onClose, required this.onOpen, this.onQueue});
+  const _Header({required this.p, required this.onClose, required this.onOpen, this.onQueue, this.onCompact});
 
   final PlayerState p;
   final VoidCallback onClose;
   final OpenPage onOpen;
   final VoidCallback? onQueue;
+  final VoidCallback? onCompact;
 
   @override
   Widget build(BuildContext context) {
@@ -412,7 +422,13 @@ class _Header extends StatelessWidget {
                   ],
                 ),
               ),
-              if (onQueue == null)
+              if (onQueue == null && onCompact != null)
+                IconButton(
+                  tooltip: 'Мини-плеер',
+                  icon: const Icon(Icons.picture_in_picture_alt_rounded),
+                  onPressed: onCompact,
+                )
+              else if (onQueue == null)
                 const SizedBox(width: 48)
               else
                 IconButton(tooltip: 'Очередь', icon: const Icon(Icons.queue_music_rounded), onPressed: onQueue),
@@ -462,49 +478,57 @@ class _Main extends StatelessWidget {
               ),
               const SizedBox(height: 20),
             ],
-            Row(
-              children: [
-                Expanded(
-                  child: Semantics(
-                    liveRegion: true,
-                    child: TrackText(track: track, big: true, onOpen: onOpen),
-                  ),
-                ),
-                if (p.wave) DislikeButton(p: p, track: track, size: 44),
-                LikeButton(p: p, track: track, size: 44),
-                if (onDownload != null)
-                  DownloadButton(download: onDownload!, link: track.link, title: track.title, size: 44),
-                _PageMenu(track: track, onOpen: onOpen),
-              ],
-            ),
-            const SizedBox(height: 8),
-            SeekBar(p: p),
-            const SizedBox(height: 4),
             Center(
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 360),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                constraints: const BoxConstraints(maxWidth: _controlsWidth),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    if (p.wave) const SizedBox(width: 44) else ShuffleButton(p: p, size: 44),
-                    SkipButton(p: p, forward: false, size: 48),
-                    PlayPauseButton(p: p, size: 64),
-                    SkipButton(p: p, forward: true, size: 48),
-                    RepeatButton(p: p, size: 44),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Semantics(
+                            liveRegion: true,
+                            child: TrackText(track: track, big: true, onOpen: onOpen),
+                          ),
+                        ),
+                        if (p.wave) DislikeButton(p: p, track: track, size: 44),
+                        LikeButton(p: p, track: track, size: 44),
+                        TrackMenu(track: track, onOpen: onOpen, onDownload: onDownload, size: 44),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    SeekBar(p: p),
+                    const SizedBox(height: 4),
+                    Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 360),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            if (p.wave) const SizedBox(width: 44) else ShuffleButton(p: p, size: 44),
+                            SkipButton(p: p, forward: false, size: 48),
+                            PlayPauseButton(p: p, size: 64),
+                            SkipButton(p: p, forward: true, size: 48),
+                            RepeatButton(p: p, size: 44),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      alignment: WrapAlignment.spaceBetween,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: [
+                        QualityMenu(p: p),
+                        if (!phone) VolumeControl(p: p, width: 120),
+                      ],
+                    ),
                   ],
                 ),
               ),
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              alignment: WrapAlignment.spaceBetween,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              spacing: 8,
-              runSpacing: 4,
-              children: [
-                QualityMenu(p: p),
-                if (!phone) VolumeControl(p: p, width: 120),
-              ],
             ),
           ],
         );
@@ -570,28 +594,6 @@ class QueueRow extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _PageMenu extends StatelessWidget {
-  const _PageMenu({required this.track, required this.onOpen});
-
-  final PlayTrack track;
-  final OpenPage onOpen;
-
-  @override
-  Widget build(BuildContext context) {
-    final items = pageItems(track, onOpen);
-    if (items.isEmpty) return const SizedBox.shrink();
-    return MenuAnchor(
-      menuChildren: items,
-      builder: (context, menu, _) => IconButton(
-        tooltip: 'Ещё',
-        onPressed: () => menu.isOpen ? menu.close() : menu.open(),
-        style: IconButton.styleFrom(fixedSize: const Size.square(44), minimumSize: const Size.square(44)),
-        icon: const Icon(Icons.more_vert_rounded),
       ),
     );
   }

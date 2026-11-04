@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../state/models.dart';
@@ -22,13 +24,53 @@ class BrandMark extends StatelessWidget {
     return Container(
       width: size,
       height: size,
-      decoration: BoxDecoration(
-        gradient: brandGradient,
-        borderRadius: BorderRadius.circular(size * 0.3),
-      ),
-      child: Icon(Icons.download_rounded, size: size * 0.6, color: const Color(0xFF1A1600)),
+      decoration: BoxDecoration(gradient: brandGradient, borderRadius: BorderRadius.circular(size * 0.3)),
+      child: CustomPaint(painter: const _BrandGlyph(Color(0xFF1A1600))),
     );
   }
+}
+
+class _BrandGlyph extends CustomPainter {
+  const _BrandGlyph(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final s = size.shortestSide * 0.84;
+    final o = Offset((size.width - s) / 2, (size.height - s) / 2);
+    Offset at(double u, double v) => o + Offset(u * s, v * s);
+    final fill = Paint()
+      ..color = color
+      ..isAntiAlias = true;
+    final tri = Path()
+      ..moveTo(at(0.2392, 0.3993).dx, at(0.2392, 0.3993).dy)
+      ..lineTo(at(0.2392, 0.6007).dx, at(0.2392, 0.6007).dy)
+      ..lineTo(at(0.3966, 0.5).dx, at(0.3966, 0.5).dy)
+      ..close();
+    canvas.drawPath(tri, fill);
+    canvas.drawPath(
+      tri,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 0.12 * s
+        ..strokeJoin = StrokeJoin.round,
+    );
+    final arc = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.085 * s
+      ..strokeCap = StrokeCap.round;
+    final c = at(0.485, 0.5);
+    for (final (r, span) in const [(0.1575, 42.0), (0.3175, 46.0)]) {
+      final a = span * math.pi / 180;
+      canvas.drawArc(Rect.fromCircle(center: c, radius: r * s), -a, 2 * a, false, arc);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_BrandGlyph old) => old.color != color;
 }
 
 class PlusBadge extends StatelessWidget {
@@ -43,12 +85,7 @@ class PlusBadge extends StatelessWidget {
       decoration: BoxDecoration(gradient: plusGradient, borderRadius: BorderRadius.circular(20)),
       child: Text(
         label,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.2,
-        ),
+        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.2),
       ),
     );
   }
@@ -85,13 +122,7 @@ class AccountAvatar extends StatelessWidget {
 }
 
 class Cover extends StatelessWidget {
-  const Cover({
-    super.key,
-    required this.url,
-    required this.size,
-    this.kind = ReleaseKind.album,
-    this.radius,
-  });
+  const Cover({super.key, required this.url, required this.size, this.kind = ReleaseKind.album, this.radius});
 
   final String url;
   final double size;
@@ -99,11 +130,11 @@ class Cover extends StatelessWidget {
   final double? radius;
 
   IconData get _icon => switch (kind) {
-        ReleaseKind.track => Icons.music_note_rounded,
-        ReleaseKind.album => Icons.album_rounded,
-        ReleaseKind.playlist => Icons.queue_music_rounded,
-        ReleaseKind.artist => Icons.person_rounded,
-      };
+    ReleaseKind.track => Icons.music_note_rounded,
+    ReleaseKind.album => Icons.album_rounded,
+    ReleaseKind.playlist => Icons.queue_music_rounded,
+    ReleaseKind.artist => Icons.person_rounded,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -220,8 +251,7 @@ class ExplicitBadge extends StatelessWidget {
         ),
         child: Text(
           'E',
-          style:
-              TextStyle(fontSize: size * 0.68, height: 1, fontWeight: FontWeight.w800, color: scheme.surface),
+          style: TextStyle(fontSize: size * 0.68, height: 1, fontWeight: FontWeight.w800, color: scheme.surface),
         ),
       ),
     );
@@ -268,11 +298,7 @@ Future<bool> confirm(
           child: Text(body, style: TextStyle(color: scheme.onSurfaceVariant, height: 1.45)),
         ),
         actions: [
-          TextButton(
-            autofocus: true,
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Отмена'),
-          ),
+          TextButton(autofocus: true, onPressed: () => Navigator.pop(context, false), child: const Text('Отмена')),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: scheme.error, foregroundColor: scheme.onError),
             onPressed: () => Navigator.pop(context, true),

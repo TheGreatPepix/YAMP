@@ -7,6 +7,8 @@ type uiState struct {
 	Quality     string `json:"quality"`
 	Concurrency int    `json:"concurrency"`
 	Version     string `json:"version"`
+	Discord     bool   `json:"discord"`
+	DiscordOK   bool   `json:"discordAvailable"`
 	Log         string `json:"log,omitempty"`
 }
 
@@ -19,6 +21,8 @@ func (g *App) emitState(withLog bool) {
 		Quality:     string(g.cfg.quality()),
 		Concurrency: g.cfg.Concurrency,
 		Version:     Version,
+		Discord:     g.cfg.discord(),
+		DiscordOK:   g.discord.Enabled(),
 	}
 	g.mu.Unlock()
 	if withLog {

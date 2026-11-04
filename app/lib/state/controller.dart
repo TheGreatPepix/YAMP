@@ -8,6 +8,7 @@ import '../desktop.dart';
 import '../player/engine.dart';
 import 'models.dart';
 import 'player.dart';
+import 'presence.dart';
 import 'search.dart';
 
 enum Section { home, search, collection }
@@ -25,11 +26,13 @@ class Controller extends ChangeNotifier {
       if (downloadsOpen.value) player.panelOpen.value = false;
     });
     this.desktop.listen(exit: _trayExit);
+    _presence = Presence(player, send);
   }
 
   final Core core;
   final Desktop desktop;
   late final StreamSubscription<Event> _sub;
+  late final Presence _presence;
 
   final _notices = StreamController<Notice>.broadcast();
   Stream<Notice> get notices => _notices.stream;
@@ -49,6 +52,8 @@ class Controller extends ChangeNotifier {
   var quality = Quality.lossless;
   var concurrency = 4;
   var version = '';
+  var discord = true;
+  var discordAvailable = false;
 
   UpdateInfo? update;
   var checkingUpdate = false;
@@ -56,6 +61,8 @@ class Controller extends ChangeNotifier {
   final updateProgress = ValueNotifier<double?>(null);
 
   final downloadsOpen = ValueNotifier(false);
+  final compact = ValueNotifier(false);
+  final pinned = ValueNotifier(false);
   final section = ValueNotifier(Section.home);
   final PlayerState player;
   late final search = SearchState(send);
@@ -182,6 +189,28 @@ class Controller extends ChangeNotifier {
   void setConcurrency(int n) {
     concurrency = n;
     send({'cmd': 'prefs', 'concurrency': n});
+    notifyListeners();
+  }
+
+  static const compactSize = Size(380, 168);
+
+  bool get canCompact => desktop.canCompact;
+
+  void setCompact(bool on) {
+    if (compact.value == on) return;
+    if (!on) pinned.value = false;
+    compact.value = on;
+    desktop.compact(on, width: compactSize.width.round(), height: compactSize.height.round());
+  }
+
+  void togglePin() {
+    pinned.value = !pinned.value;
+    desktop.pin(pinned.value);
+  }
+
+  void setDiscord(bool on) {
+    discord = on;
+    send({'cmd': 'prefs', 'discord': on});
     notifyListeners();
   }
 
@@ -314,6 +343,8 @@ class Controller extends ChangeNotifier {
         quality = ev['quality'] == 'mp3' ? Quality.mp3 : Quality.lossless;
         concurrency = (ev['concurrency'] as num?)?.toInt() ?? concurrency;
         version = '${ev['version'] ?? ''}';
+        discord = ev['discord'] != false;
+        discordAvailable = ev['discordAvailable'] == true;
         if (ev['log'] is String) log.value = ev['log'] as String;
         ready = true;
       case 'account':
@@ -386,7 +417,10 @@ class Controller extends ChangeNotifier {
     }
     search.dispose();
     downloadsOpen.dispose();
+    compact.dispose();
+    pinned.dispose();
     section.dispose();
+    _presence.dispose();
     player.dispose();
     stats.dispose();
     log.dispose();

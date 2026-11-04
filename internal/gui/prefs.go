@@ -27,6 +27,7 @@ type config struct {
 	Volume      *float64 `json:"volume,omitempty"`
 	Repeat      string   `json:"repeat,omitempty"`
 	Shuffle     bool     `json:"shuffle,omitempty"`
+	Discord     *bool    `json:"discord,omitempty"`
 
 	Token    string `json:"token,omitempty"`
 	Refresh  string `json:"refresh,omitempty"`
@@ -89,6 +90,7 @@ func loadConfig() config {
 			}
 			c.Repeat = string(player.ParseRepeat(saved.Repeat))
 			c.Shuffle = saved.Shuffle
+			c.Discord = saved.Discord
 		}
 	}
 	return c

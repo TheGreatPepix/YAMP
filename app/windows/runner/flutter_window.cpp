@@ -1,6 +1,8 @@
 #include "flutter_window.h"
 
+#include <dwmapi.h>
 #include <flutter/standard_method_codec.h>
+#include <flutter_windows.h>
 
 #include <optional>
 
@@ -37,6 +39,40 @@ std::wstring StringArg(const flutter::EncodableValue* args, const char* key) {
   auto text = std::get_if<std::string>(&it->second);
   return text ? Wide(*text) : std::wstring();
 }
+
+bool BoolArg(const flutter::EncodableValue* args, const char* key) {
+  auto map = args ? std::get_if<flutter::EncodableMap>(args) : nullptr;
+  if (!map) {
+    return false;
+  }
+  auto it = map->find(flutter::EncodableValue(key));
+  if (it == map->end()) {
+    return false;
+  }
+  auto value = std::get_if<bool>(&it->second);
+  return value && *value;
+}
+
+int IntArg(const flutter::EncodableValue* args, const char* key, int fallback) {
+  auto map = args ? std::get_if<flutter::EncodableMap>(args) : nullptr;
+  if (!map) {
+    return fallback;
+  }
+  auto it = map->find(flutter::EncodableValue(key));
+  if (it == map->end()) {
+    return fallback;
+  }
+  if (auto value = std::get_if<int32_t>(&it->second)) {
+    return *value;
+  }
+  if (auto value = std::get_if<int64_t>(&it->second)) {
+    return static_cast<int>(*value);
+  }
+  return fallback;
+}
+
+constexpr DWORD kCornerPreference = 33;
+constexpr DWORD kCornerRound = 2, kCornerDefault = 0;
 
 }  // namespace
 
@@ -115,6 +151,20 @@ void FlutterWindow::HandleCall(
     if (!exit_label.empty()) {
       tray_exit_ = exit_label;
     }
+  } else if (method == "compact") {
+    if (BoolArg(call.arguments(), "on")) {
+      EnterCompact(IntArg(call.arguments(), "width", 380),
+                   IntArg(call.arguments(), "height", 168));
+    } else {
+      LeaveCompact();
+    }
+  } else if (method == "pin") {
+    Pin(BoolArg(call.arguments(), "on"));
+  } else if (method == "drag") {
+    if (HWND hwnd = GetHandle()) {
+      ReleaseCapture();
+      SendMessageW(hwnd, WM_SYSCOMMAND, SC_MOVE | HTCAPTION, 0);
+    }
   } else if (method == "quit") {
     quitting_ = true;
     RemoveTrayIcon();
@@ -147,7 +197,9 @@ void FlutterWindow::ShowWindowNow() {
       theirs != 0 && theirs != ours && AttachThreadInput(theirs, ours, TRUE);
   const UINT flags = SWP_NOSIZE | SWP_NOMOVE | SWP_SHOWWINDOW;
   SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, flags);
-  SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, flags);
+  if (!pinned_) {
+    SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, flags);
+  }
   BringWindowToTop(hwnd);
   if (!SetForegroundWindow(hwnd)) {
     FlashWindow(hwnd, TRUE);
@@ -155,6 +207,76 @@ void FlutterWindow::ShowWindowNow() {
   if (attached) {
     AttachThreadInput(theirs, ours, FALSE);
   }
+}
+
+SIZE FlutterWindow::CompactFrame() {
+  HWND hwnd = GetHandle();
+  HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+  double scale = FlutterDesktopGetDpiForMonitor(monitor) / 96.0;
+  RECT frame = {0, 0, static_cast<LONG>(compact_width_ * scale),
+                static_cast<LONG>(compact_height_ * scale)};
+  AdjustWindowRectEx(&frame, static_cast<DWORD>(GetWindowLongPtr(hwnd, GWL_STYLE)),
+                     FALSE, static_cast<DWORD>(GetWindowLongPtr(hwnd, GWL_EXSTYLE)));
+  return {frame.right - frame.left, frame.bottom - frame.top};
+}
+
+void FlutterWindow::EnterCompact(int width, int height) {
+  HWND hwnd = GetHandle();
+  if (!hwnd) {
+    return;
+  }
+  compact_width_ = width;
+  compact_height_ = height;
+  if (!compact_) {
+    saved_place_.length = sizeof(saved_place_);
+    GetWindowPlacement(hwnd, &saved_place_);
+    saved_style_ = GetWindowLongPtr(hwnd, GWL_STYLE);
+    compact_ = true;
+    if (IsZoomed(hwnd) || IsIconic(hwnd)) {
+      ShowWindow(hwnd, SW_RESTORE);
+    }
+    SetWindowLongPtr(hwnd, GWL_STYLE, (saved_style_ & ~WS_OVERLAPPEDWINDOW) | WS_POPUP);
+    DWORD corner = kCornerRound;
+    DwmSetWindowAttribute(hwnd, kCornerPreference, &corner, sizeof(corner));
+  }
+  SIZE size = CompactFrame();
+  HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+  MONITORINFO info = {sizeof(info)};
+  GetMonitorInfoW(monitor, &info);
+  LONG margin =
+      static_cast<LONG>(24 * FlutterDesktopGetDpiForMonitor(monitor) / 96.0);
+  LONG x = info.rcWork.right - size.cx - margin;
+  LONG y = info.rcWork.bottom - size.cy - margin;
+  SetWindowPos(hwnd, nullptr, x, y, size.cx, size.cy,
+               SWP_NOZORDER | SWP_FRAMECHANGED | SWP_SHOWWINDOW);
+}
+
+void FlutterWindow::LeaveCompact() {
+  HWND hwnd = GetHandle();
+  if (!hwnd || !compact_) {
+    return;
+  }
+  Pin(false);
+  compact_ = false;
+  SetWindowLongPtr(hwnd, GWL_STYLE, saved_style_);
+  DWORD corner = kCornerDefault;
+  DwmSetWindowAttribute(hwnd, kCornerPreference, &corner, sizeof(corner));
+  SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
+               SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+  if (saved_place_.showCmd == SW_SHOWMINIMIZED) {
+    saved_place_.showCmd = SW_SHOWNORMAL;
+  }
+  SetWindowPlacement(hwnd, &saved_place_);
+}
+
+void FlutterWindow::Pin(bool on) {
+  HWND hwnd = GetHandle();
+  if (!hwnd) {
+    return;
+  }
+  pinned_ = on;
+  SetWindowPos(hwnd, on ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0, 0,
+               SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 }
 
 void FlutterWindow::HideWindow() {
@@ -247,6 +369,15 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
         ShowTrayMenu();
       }
       return 0;
+    case WM_GETMINMAXINFO:
+      if (compact_) {
+        SIZE size = CompactFrame();
+        auto info = reinterpret_cast<MINMAXINFO*>(lparam);
+        info->ptMinTrackSize.x = size.cx;
+        info->ptMinTrackSize.y = size.cy;
+        return 0;
+      }
+      break;
     case WM_CLOSE:
       if (!quitting_) {
         HideWindow();

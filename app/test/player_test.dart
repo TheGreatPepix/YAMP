@@ -10,6 +10,7 @@ import 'package:yamp/state/controller.dart';
 import 'package:yamp/state/player.dart';
 import 'package:yamp/ui/player/artist_view.dart';
 import 'package:yamp/ui/player/controls.dart';
+import 'package:yamp/ui/player/history_view.dart';
 import 'package:yamp/ui/player/library_view.dart';
 import 'package:yamp/ui/player/mini_player.dart';
 import 'package:yamp/ui/player/now_playing.dart';
@@ -195,6 +196,80 @@ void main() {
     await tester.pump();
     expect(engine.isPlaying, isTrue);
 
+    await core.close();
+  });
+
+  test('дни истории подписаны по-русски', () {
+    final now = DateTime(2026, 11, 4, 0, 30);
+    expect(dayLabel('2026-11-04', now), 'Сегодня');
+    expect(dayLabel('2026-11-03', now), 'Вчера');
+    expect(dayLabel('2026-11-02', now), '2 ноября');
+    expect(dayLabel('2026-01-15', now), '15 января');
+    expect(dayLabel('2025-12-31', now), '31 декабря 2025');
+    expect(dayLabel('2026-02-28', DateTime(2026, 3, 1, 23)), 'Вчера');
+    expect(dayLabel('2026-03-28', DateTime(2026, 3, 29, 12)), 'Вчера');
+    expect(dayLabel('2026-10-24', DateTime(2026, 10, 25, 12)), 'Вчера');
+    expect(dayLabel('вчера', now), 'вчера');
+  });
+
+  testWidgets('история: с главной по дням, запуск трека из нужного дня, лайк и назад', (tester) async {
+    final (core, c, _) = await _open(tester);
+
+    expect(find.text('Вы недавно слушали'), findsOneWidget);
+    await tester.tap(find.text('Вся история'));
+    await _settle(tester);
+    expect(c.player.browse.value, sourceHistory);
+    expect(find.text('ПРОСЛУШИВАНИЯ'), findsOneWidget);
+    expect(find.text('История'), findsWidgets);
+    expect(find.text('Сегодня'), findsOneWidget);
+    expect(find.text('Вчера'), findsOneWidget);
+    final now = DateTime.now();
+    String ago(int days) => DateTime(now.year, now.month, now.day - days).toIso8601String().substring(0, 10);
+    expect(find.text(dayLabel(ago(4), now)), findsOneWidget);
+    expect(find.text('3 трека'), findsNWidgets(2));
+    expect(find.text('Скачать'), findsNothing);
+
+    final yesterday = find.byKey(ValueKey('${ago(1)}:1'));
+    expect(yesterday, findsOneWidget);
+    await tester.tap(yesterday);
+    await _settle(tester);
+    expect(c.player.track!.title, 'Звезда по имени Солнце');
+    expect(c.player.source!.id, sourceHistory);
+    expect(c.player.pos, 5);
+
+    final row = find.ancestor(of: find.text('Ветер'), matching: find.byType(TrackRow));
+    await tester.tap(find.descendant(of: row, matching: _tip('Мне нравится')));
+    await _settle(tester);
+    expect(find.descendant(of: row, matching: _tip('Убрать из «Мне нравится»')), findsOneWidget);
+    await tester.tap(find.descendant(of: row, matching: _tip('Ещё')));
+    await _settle(tester);
+    expect(find.text('Скачать FLAC'), findsOneWidget);
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await _settle(tester);
+
+    await tester.tap(find.text('Назад').first);
+    await _settle(tester);
+    expect(c.player.browse.value, sourceHome);
+    expect(find.text('Для вас'), findsOneWidget);
+
+    await tester.tap(find.text('История').first);
+    await _settle(tester);
+    expect(find.text('Сегодня'), findsOneWidget);
+    await core.close();
+  });
+
+  testWidgets('история на телефоне открывается с главной и закрывается назад', (tester) async {
+    final (core, c, _) = await _open(tester, size: const Size(320, 640));
+    final more = find.text('Вся история');
+    await tester.ensureVisible(more);
+    await tester.pumpAndSettle();
+    await tester.tap(more);
+    await _settle(tester);
+    expect(find.text('Сегодня'), findsOneWidget);
+    await tester.tap(_tip('Назад'));
+    await _settle(tester);
+    expect(c.player.browsing.value, isFalse);
+    expect(find.text('Вся история'), findsOneWidget);
     await core.close();
   });
 
@@ -525,16 +600,18 @@ void main() {
         }
       }
       c.player.panelOpen.value = false;
-      c.openPage(fakeArtist('Кино'));
-      await tester.pump(const Duration(milliseconds: 300));
-      await tester.pumpAndSettle();
-      for (var w = 320.0; w <= 1400; w += 40) {
-        tester.view.physicalSize = Size(w, 760);
+      for (final page in [fakeArtist('Кино'), sourceHistory]) {
+        c.openPage(page);
+        await tester.pump(const Duration(milliseconds: 300));
         await tester.pumpAndSettle();
-        await tester.drag(find.byType(Scrollable).last, const Offset(0, -2000));
-        await tester.pumpAndSettle();
-        await tester.drag(find.byType(Scrollable).last, const Offset(0, 2000));
-        await tester.pumpAndSettle();
+        for (var w = 320.0; w <= 1400; w += 40) {
+          tester.view.physicalSize = Size(w, 760);
+          await tester.pumpAndSettle();
+          await tester.drag(find.byType(Scrollable).last, const Offset(0, -2000));
+          await tester.pumpAndSettle();
+          await tester.drag(find.byType(Scrollable).last, const Offset(0, 2000));
+          await tester.pumpAndSettle();
+        }
       }
       await core.close();
     });

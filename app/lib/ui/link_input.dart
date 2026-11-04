@@ -53,19 +53,6 @@ class _LinkInputState extends State<LinkInput> {
     if (text.trim().isNotEmpty && !looksLikeLinks(text)) c.openSearch();
   }
 
-  Future<void> _paste() async {
-    final data = await Clipboard.getData(Clipboard.kTextPlain);
-    final text = (data?.text ?? '').trim();
-    if (text.isEmpty) return;
-    if (looksLikeLinks(text)) {
-      _open(text);
-      return;
-    }
-    _input.text = text;
-    _input.selection = TextSelection.collapsed(offset: text.length);
-    _find(text);
-  }
-
   Future<void> _pasteInline() async {
     final data = await Clipboard.getData(Clipboard.kTextPlain);
     final text = (data?.text ?? '').trim();
@@ -94,35 +81,31 @@ class _LinkInputState extends State<LinkInput> {
         final text = _input.text.trim();
         final empty = text.isEmpty;
         final link = looksLikeLinks(text);
-        final Widget action = Padding(
-          padding: const EdgeInsets.only(right: 6),
-          child: empty
-              ? IconButton(
-                  tooltip: 'Вставить',
-                  icon: const Icon(Icons.content_paste_rounded, size: 20),
-                  onPressed: _paste,
-                )
-              : !link
-              ? IconButton(
-                  tooltip: 'Очистить',
-                  icon: const Icon(Icons.close_rounded, size: 20),
-                  onPressed: _clear,
-                )
-              : IconButton.filled(
-                  tooltip: 'Открыть',
-                  style: IconButton.styleFrom(
-                    backgroundColor: scheme.primary,
-                    foregroundColor: scheme.onPrimary,
-                    shape: const CircleBorder(),
-                    fixedSize: const Size(32, 32),
-                    minimumSize: const Size(32, 32),
-                    padding: EdgeInsets.zero,
-                  ),
-                  iconSize: 20,
-                  icon: const Icon(Icons.arrow_forward_rounded),
-                  onPressed: _submit,
-                ),
-        );
+        final Widget? action = empty
+            ? null
+            : Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: !link
+                    ? IconButton(
+                        tooltip: 'Очистить',
+                        icon: const Icon(Icons.close_rounded, size: 20),
+                        onPressed: _clear,
+                      )
+                    : IconButton.filled(
+                        tooltip: 'Открыть',
+                        style: IconButton.styleFrom(
+                          backgroundColor: scheme.primary,
+                          foregroundColor: scheme.onPrimary,
+                          shape: const CircleBorder(),
+                          fixedSize: const Size(32, 32),
+                          minimumSize: const Size(32, 32),
+                          padding: EdgeInsets.zero,
+                        ),
+                        iconSize: 20,
+                        icon: const Icon(Icons.arrow_forward_rounded),
+                        onPressed: _submit,
+                      ),
+              );
         final radius = BorderRadius.circular(12);
         return CallbackShortcuts(
           bindings: {

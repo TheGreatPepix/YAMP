@@ -78,8 +78,25 @@ class FakePlayer {
       {..._track(i, id: 'c${i + 1}'), 'title': 'Хит ${i + 1}', 'artist': 'Чартовый', 'artists': const []},
   ];
 
+  static String _date(int ago) {
+    final now = DateTime.now();
+    final d = DateTime(now.year, now.month, now.day - ago);
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${d.year}-${two(d.month)}-${two(d.day)}';
+  }
+
+  static const _historyDays = [
+    (0, [0, 1, 2]),
+    (1, [3, 4, 0]),
+    (4, [5, 6, 7, 1]),
+  ];
+
   List<Map<String, Object?>> _list(String source) => switch (source) {
     'chart' => _chart(),
+    'history' => [
+      for (final (_, songs) in _historyDays)
+        for (final i in songs) _track(i),
+    ],
     _ when source.contains('/track/') => [_track(0, id: source.split('/').last)],
     'liked' => [
       for (var i = 0; i < _songs.length; i++)
@@ -104,6 +121,7 @@ class FakePlayer {
     _ when source.contains('/track/') => {'kind': 'track', 'id': source, 'title': _songs[0].$1},
     'liked' => {'kind': 'liked', 'id': 'liked', 'title': 'Мне нравится'},
     'chart' => {'kind': 'chart', 'id': 'chart', 'title': 'Чарт'},
+    'history' => {'kind': 'history', 'id': 'history', 'title': 'История'},
     fakeEmptyPlaylist => {'kind': 'playlist', 'id': source, 'title': 'Пустой'},
     _ => {'kind': 'playlist', 'id': source, 'title': 'Дорога'},
   };
@@ -228,6 +246,10 @@ class FakePlayer {
             'source': source,
             'info': _info(source),
             'tracks': _list(source),
+            if (source == 'history')
+              'days': [
+                for (final (ago, songs) in _historyDays) {'date': _date(ago), 'count': songs.length},
+              ],
             if (source.contains('/artist/') && !source.endsWith('/tracks'))
               'albums': [
                 {'source': 'https://music.yandex.ru/album/10', 'title': 'Группа крови', 'year': 1988, 'count': 8},
@@ -283,14 +305,19 @@ class FakePlayer {
         _wave = false;
         _loading = false;
         _source = _info(source);
+        final all = _list(source);
         _queue = [
-          for (final t in _list(source))
+          for (final t in all)
             if (t['unavailable'] != true) t,
         ];
         if (_queue.isEmpty) return true;
         final i = _queue.indexWhere((t) => t['id'] == track);
         final index = (c['index'] as int?) ?? 0;
-        _pos = i >= 0 ? i : index.clamp(0, _queue.length - 1);
+        final exact =
+            index >= 0 && index < all.length && all[index]['id'] == track && all[index]['unavailable'] != true;
+        _pos = exact
+            ? all.take(index).where((t) => t['unavailable'] != true).length
+            : (i >= 0 ? i : index.clamp(0, _queue.length - 1));
         if (_shuffle) {
           final cur = _queue.removeAt(_pos);
           _queue = [cur, ..._queue.reversed];

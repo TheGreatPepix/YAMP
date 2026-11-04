@@ -14,8 +14,9 @@ import (
 )
 
 const (
-	sourceWave  = "wave"
-	sourceLiked = "liked"
+	sourceWave    = "wave"
+	sourceLiked   = "liked"
+	sourceHistory = "history"
 
 	playFrom      = "desktop_win-yamp-player-default"
 	restartAfter  = 3.0
@@ -127,7 +128,13 @@ type trackList struct {
 	Source playSource
 	Tracks []yam.Track
 	Albums []yam.AlbumInfo
+	Days   []historyDay
 	at     time.Time
+}
+
+type historyDay struct {
+	Date  string `json:"date"`
+	Count int    `json:"count"`
 }
 
 type waveState struct {
@@ -375,6 +382,16 @@ func (g *App) loadSource(ctx context.Context, sess *yam.Session, source string) 
 			return nil, err
 		}
 		list = &trackList{Source: playSource{Kind: sourceLiked, ID: sourceLiked, Title: "Мне нравится"}, Tracks: tracks}
+	} else if source == sourceHistory {
+		days, err := sess.HistoryDays(ctx)
+		if err != nil {
+			return nil, err
+		}
+		list = &trackList{Source: playSource{Kind: sourceHistory, ID: sourceHistory, Title: "История"}}
+		for _, d := range days {
+			list.Tracks = append(list.Tracks, d.Tracks...)
+			list.Days = append(list.Days, historyDay{Date: d.Date, Count: len(d.Tracks)})
+		}
 	} else if source == yam.ChartLink {
 		rel, err := sess.Chart(ctx)
 		if err != nil {
@@ -431,6 +448,9 @@ func (g *App) openSource(source string) {
 		tracks := g.player.shapeAll(list.Tracks)
 		g.player.mu.Unlock()
 		ev := map[string]any{"type": "tracks", "source": source, "info": list.Source, "tracks": tracks}
+		if list.Days != nil {
+			ev["days"] = list.Days
+		}
 		if len(list.Albums) > 0 && list.Source.Kind == string(yam.KindArtist) && !strings.HasSuffix(source, "/tracks") {
 			ev["albums"] = sourceAlbums(list.Albums)
 		}
@@ -483,7 +503,9 @@ func (g *App) play(source, trackID string, index int, seeds []string) {
 			return
 		}
 		start := max(0, min(index, len(tracks)-1))
-		if i := slices.IndexFunc(tracks, func(t yam.Track) bool { return t.ID == trackID }); i >= 0 {
+		if index >= 0 && index < len(list.Tracks) && list.Tracks[index].ID == trackID && list.Tracks[index].Available {
+			start = len(playable(list.Tracks[:index]))
+		} else if i := slices.IndexFunc(tracks, func(t yam.Track) bool { return t.ID == trackID }); i >= 0 {
 			start = i
 		} else if trackID == "" && index < 0 && shuffle {
 			start = rand.IntN(len(tracks))

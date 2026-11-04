@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"yamp/internal/discord"
 	"yamp/internal/yam"
 )
 
@@ -39,6 +40,9 @@ type App struct {
 	searchCancel context.CancelFunc
 	deviceCancel context.CancelFunc
 	grant        *yam.Grant
+
+	discord  *discord.Client
+	presence *discord.Activity
 }
 
 type accountEvent struct {
@@ -55,6 +59,7 @@ func newApp() *App {
 	g.player = newPlayerState(g.cfg)
 	g.token = g.cfg.token()
 	g.account = accountEvent{Type: "account", Status: accNone}
+	g.discord = discord.New(discordID(), func(s string) { g.logf("%s", s) })
 	return g
 }
 

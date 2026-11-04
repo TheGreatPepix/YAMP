@@ -36,6 +36,11 @@ class FlutterWindow : public Win32Window {
   void ToggleWindow();
   bool Visible();
 
+  void EnterCompact(int width, int height);
+  void LeaveCompact();
+  void Pin(bool on);
+  SIZE CompactFrame();
+
   void AddTrayIcon();
   void RemoveTrayIcon();
   void ShowTrayMenu();
@@ -45,6 +50,11 @@ class FlutterWindow : public Win32Window {
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> channel_;
 
   bool quitting_ = false;
+  bool compact_ = false;
+  bool pinned_ = false;
+  int compact_width_ = 0, compact_height_ = 0;
+  LONG_PTR saved_style_ = 0;
+  WINDOWPLACEMENT saved_place_ = {sizeof(WINDOWPLACEMENT)};
   bool active_ = false;
   std::chrono::steady_clock::time_point left_at_;
 

@@ -34,6 +34,12 @@ type uiCommand struct {
 	Volume      float64  `json:"volume"`
 	Seeds       []string `json:"seeds"`
 	Message     string   `json:"message"`
+	Discord     *bool    `json:"discord"`
+	Title       string   `json:"title"`
+	Artist      string   `json:"artist"`
+	Cover       string   `json:"cover"`
+	Duration    float64  `json:"duration"`
+	Playing     bool     `json:"playing"`
 	Select      []struct {
 		Album  string   `json:"album"`
 		Tracks []string `json:"tracks"`
@@ -123,6 +129,8 @@ func (g *App) onMessage(message string) {
 		g.emitPlayer("")
 	case "queue":
 		g.emitQueue()
+	case "presence":
+		g.setPresence(c)
 	case "like":
 		g.mark(c.Track, c.On, false, c.Position)
 	case "dislike":
@@ -168,10 +176,17 @@ func (g *App) setPrefs(c uiCommand) {
 		g.cfg.Concurrency = clampConcurrency(c.Concurrency)
 		g.jobs.gate.setLimit(g.cfg.Concurrency)
 	}
+	if c.Discord != nil {
+		on := *c.Discord
+		g.cfg.Discord = &on
+	}
 	err := g.cfg.save()
 	g.mu.Unlock()
 	if err != nil {
 		g.notice("Не удалось сохранить настройки: "+err.Error(), "error")
+	}
+	if c.Discord != nil {
+		g.applyPresence()
 	}
 	g.emitState(false)
 }

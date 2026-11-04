@@ -3,15 +3,25 @@ import 'package:flutter/material.dart';
 import '../../state/models.dart';
 import '../../state/player.dart';
 import '../../theme.dart';
+import '../download_menu.dart';
 import '../widgets.dart';
 import 'controls.dart';
 
 class MiniPlayer extends StatelessWidget {
-  const MiniPlayer({super.key, required this.p, required this.phone, required this.onOpen});
+  const MiniPlayer({
+    super.key,
+    required this.p,
+    required this.phone,
+    required this.onOpen,
+    this.onDownload,
+    this.onCompact,
+  });
 
   final PlayerState p;
   final bool phone;
   final OpenPage onOpen;
+  final Download? onDownload;
+  final VoidCallback? onCompact;
 
   @override
   Widget build(BuildContext context) {
@@ -19,7 +29,7 @@ class MiniPlayer extends StatelessWidget {
       listenable: p,
       builder: (context, _) {
         if (!p.hasTrack && !p.loading) return const SizedBox.shrink();
-        return phone ? _Phone(p: p) : _Desktop(p: p, onOpen: onOpen);
+        return phone ? _Phone(p: p) : _Desktop(p: p, onOpen: onOpen, onDownload: onDownload, onCompact: onCompact);
       },
     );
   }
@@ -93,10 +103,12 @@ class _NowTitle extends StatelessWidget {
 }
 
 class _Desktop extends StatelessWidget {
-  const _Desktop({required this.p, required this.onOpen});
+  const _Desktop({required this.p, required this.onOpen, this.onDownload, this.onCompact});
 
   final PlayerState p;
   final OpenPage onOpen;
+  final Download? onDownload;
+  final VoidCallback? onCompact;
 
   @override
   Widget build(BuildContext context) {
@@ -106,6 +118,7 @@ class _Desktop extends StatelessWidget {
       builder: (context, box) {
         final wide = box.maxWidth >= 1100;
         final roomy = box.maxWidth >= 820;
+        final spacious = box.maxWidth >= 1240;
         return Container(
           constraints: const BoxConstraints(minHeight: 80),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -125,6 +138,7 @@ class _Desktop extends StatelessWidget {
                       const SizedBox(width: 4),
                       LikeButton(p: p, track: t),
                       if (p.wave && roomy) DislikeButton(p: p, track: t),
+                      if (roomy) TrackMenu(track: t, onOpen: onOpen, onDownload: onDownload),
                     ],
                   ],
                 ),
@@ -158,6 +172,12 @@ class _Desktop extends StatelessWidget {
                   children: [
                     if (roomy) Flexible(child: QualityMenu(p: p)),
                     if (wide) VolumeControl(p: p) else _MuteOnly(p: p),
+                    if (onCompact != null && spacious)
+                      IconButton(
+                        tooltip: 'Мини-плеер',
+                        onPressed: onCompact,
+                        icon: const Icon(Icons.picture_in_picture_alt_rounded),
+                      ),
                     IconButton(
                       tooltip: 'Открыть плеер и очередь',
                       onPressed: p.hasTrack ? () => p.panelOpen.value = true : null,

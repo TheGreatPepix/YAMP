@@ -15,6 +15,7 @@ const sourceWave = 'wave';
 const sourceLiked = 'liked';
 const sourceHome = 'home';
 const sourceChart = 'chart';
+const sourceHistory = 'history';
 
 String topTracksOf(String artist) => '$artist/tracks';
 
@@ -189,12 +190,22 @@ class Library {
   final String error;
 }
 
+class HistoryDay {
+  const HistoryDay({required this.date, required this.count});
+
+  factory HistoryDay.fromJson(Map<String, dynamic> j) => HistoryDay(date: _s(j['date']), count: _i(j['count']));
+
+  final String date;
+  final int count;
+}
+
 class TrackList {
   const TrackList({
     this.status = LoadStatus.loading,
     this.info,
     this.tracks = const [],
     this.albums = const [],
+    this.days = const [],
     this.error = '',
   });
 
@@ -202,6 +213,7 @@ class TrackList {
   final PlaySource? info;
   final List<PlayTrack> tracks;
   final List<SourceAlbum> albums;
+  final List<HistoryDay> days;
   final String error;
 
   Duration get total => tracks.fold(Duration.zero, (sum, t) => sum + t.duration);
@@ -362,6 +374,10 @@ class PlayerState extends ChangeNotifier {
                 albums: [
                   for (final a in (ev['albums'] as List? ?? const []))
                     if (a is Map<String, dynamic>) SourceAlbum.fromJson(a),
+                ],
+                days: [
+                  for (final d in (ev['days'] as List? ?? const []))
+                    if (d is Map<String, dynamic>) HistoryDay.fromJson(d),
                 ],
               );
       default:
@@ -574,7 +590,10 @@ class PlayerState extends ChangeNotifier {
       return;
     }
     final known = lists[source];
-    if (!force && known != null && known.status != LoadStatus.error) return;
+    if (!force && known != null && known.status != LoadStatus.error) {
+      if (source == sourceHistory && known.status == LoadStatus.ok) _send({'cmd': 'open', 'source': source});
+      return;
+    }
     lists[source] = const TrackList();
     _send({'cmd': 'open', 'source': source});
     notifyListeners();

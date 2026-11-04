@@ -49,6 +49,15 @@ class Desktop {
 
   void showWindow() => _call('show');
 
+  bool get canCompact => Platform.isWindows;
+
+  Future<void> compact(bool on, {int width = 0, int height = 0}) =>
+      _call('compact', {'on': on, 'width': width, 'height': height});
+
+  Future<void> pin(bool on) => _call('pin', {'on': on});
+
+  void drag() => _call('drag');
+
   Future<bool> _androidCall(String method, String arg) async {
     try {
       return await _android.invokeMethod<bool>(method, arg) ?? false;
