@@ -12,7 +12,7 @@ import 'package:yamp/ui/search_view.dart';
 
 Future<(FakeCore, Controller)> _open(
   WidgetTester tester, {
-  String latest = '0.1.2',
+  String latest = '0.1.3',
   Duration tick = const Duration(milliseconds: 120),
 }) async {
   tester.view.physicalSize = const Size(1280, 860);
@@ -87,7 +87,7 @@ void main() {
     final (core, c) = await _open(tester);
 
     expect(c.ready, isTrue);
-    expect(c.version, '0.1.2');
+    expect(c.version, '0.1.3');
     expect(find.text('Войти через Яндекс'), findsOneWidget);
     expect(find.text('Моя волна'), findsNothing);
 
@@ -197,7 +197,7 @@ void main() {
 
     await tester.tap(find.byTooltip('Настройки'));
     await tester.pumpAndSettle();
-    expect(find.text('Версия 0.1.2'), findsOneWidget);
+    expect(find.text('Версия 0.1.3'), findsOneWidget);
 
     await tester.tap(find.text('Проверить'));
     await tester.pump();

@@ -232,11 +232,7 @@ class PlayerState extends ChangeNotifier {
         if (d > Duration.zero) duration.value = d;
       }),
       engine.playing.listen(_onPlaying),
-      engine.buffering.listen((b) {
-        if (buffering == b) return;
-        buffering = b;
-        notifyListeners();
-      }),
+      engine.buffering.listen(_onBuffering),
       engine.completed.listen((_) => _onCompleted()),
       engine.errors.listen(_onError),
     ];
@@ -263,8 +259,16 @@ class PlayerState extends ChangeNotifier {
   var format = '';
   var queue = const <PlayTrack>[];
 
-  var playing = false;
+  var _engineOn = false;
+  var _advancing = false;
+  var _userPaused = false;
   var buffering = false;
+  Timer? _bufferTimer;
+
+  static const _bufferShowAfter = Duration(milliseconds: 500);
+  static const _endSlack = Duration(milliseconds: 1500);
+
+  bool get playing => _engineOn || _advancing;
   final position = ValueNotifier(Duration.zero);
   final duration = ValueNotifier(Duration.zero);
 
@@ -451,18 +455,54 @@ class PlayerState extends ChangeNotifier {
         _announced = null;
         position.value = Duration.zero;
         duration.value = Duration.zero;
+        _settleAdvance();
         engine.stop();
       case 'end':
+        _settleAdvance();
         engine.pause();
     }
   }
 
   void _onPlaying(bool v) {
-    if (playing != v) {
-      playing = v;
-      notifyListeners();
-      if (!v) savePosition();
+    if (_engineOn == v) return;
+    final was = playing;
+    _engineOn = v;
+    if (v) {
+      _advancing = false;
+      _userPaused = false;
+    } else if (!_userPaused && track != null && _nearEnd) {
+      _advancing = true;
     }
+    if (!v && !_advancing) savePosition();
+    if (playing != was) notifyListeners();
+  }
+
+  bool get _nearEnd {
+    final total = duration.value;
+    return total > Duration.zero && total - position.value < _endSlack;
+  }
+
+  void _settleAdvance() {
+    if (!_advancing) return;
+    _advancing = false;
+    if (!_engineOn) notifyListeners();
+  }
+
+  void _onBuffering(bool b) {
+    _bufferTimer?.cancel();
+    _bufferTimer = null;
+    if (!b) {
+      if (!buffering) return;
+      buffering = false;
+      notifyListeners();
+      return;
+    }
+    if (buffering) return;
+    _bufferTimer = Timer(_bufferShowAfter, () {
+      _bufferTimer = null;
+      buffering = true;
+      notifyListeners();
+    });
   }
 
   static const _reportEvery = Duration(seconds: 10);
@@ -536,7 +576,11 @@ class PlayerState extends ChangeNotifier {
       return;
     }
     if (_openPending()) return;
-    playing ? engine.pause() : engine.play();
+    if (playing) {
+      pause();
+    } else {
+      engine.play();
+    }
   }
 
   bool _openPending() {
@@ -555,7 +599,10 @@ class PlayerState extends ChangeNotifier {
   }
 
   void pause() {
-    if (playing) engine.pause();
+    if (!playing) return;
+    _userPaused = true;
+    _settleAdvance();
+    engine.pause();
   }
 
   void nextTrack() {
@@ -677,6 +724,7 @@ class PlayerState extends ChangeNotifier {
 
   @override
   void dispose() {
+    _bufferTimer?.cancel();
     for (final s in _subs) {
       s.cancel();
     }

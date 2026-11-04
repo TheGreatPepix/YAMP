@@ -11,7 +11,7 @@ import (
 	"yamp/internal/yam"
 )
 
-const Version = "0.1.2"
+const Version = "0.1.3"
 
 const (
 	accNone     = "none"

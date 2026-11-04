@@ -135,6 +135,8 @@ class SilentEngine implements AudioEngine {
 
   void progress(Duration by) => _advance(by);
 
+  void buffer(bool on) => _buffering.add(on);
+
   void fail(String message) {
     _setPlaying(false);
     _errors.add(message);

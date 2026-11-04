@@ -121,7 +121,16 @@ class AccountAvatar extends StatelessWidget {
   }
 }
 
-class Cover extends StatelessWidget {
+int coverDecodeSize(double logical, double dpr) {
+  final px = (logical * dpr).ceil();
+  var step = 64;
+  while (step < px && step < 2048) {
+    step *= 2;
+  }
+  return step;
+}
+
+class Cover extends StatefulWidget {
   const Cover({super.key, required this.url, required this.size, this.kind = ReleaseKind.album, this.radius});
 
   final String url;
@@ -129,7 +138,14 @@ class Cover extends StatelessWidget {
   final ReleaseKind kind;
   final double? radius;
 
-  IconData get _icon => switch (kind) {
+  @override
+  State<Cover> createState() => _CoverState();
+}
+
+class _CoverState extends State<Cover> {
+  var _shown = false;
+
+  IconData get _icon => switch (widget.kind) {
     ReleaseKind.track => Icons.music_note_rounded,
     ReleaseKind.album => Icons.album_rounded,
     ReleaseKind.playlist => Icons.queue_music_rounded,
@@ -137,9 +153,16 @@ class Cover extends StatelessWidget {
   };
 
   @override
+  void didUpdateWidget(Cover old) {
+    super.didUpdateWidget(old);
+    if (widget.url.isEmpty) _shown = false;
+  }
+
+  @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final r = radius ?? size * 0.14;
+    final size = widget.size;
+    final r = widget.radius ?? size * 0.14;
     final placeholder = Container(
       width: size,
       height: size,
@@ -154,25 +177,29 @@ class Cover extends StatelessWidget {
     );
     final dpr = MediaQuery.devicePixelRatioOf(context);
     return ClipRRect(
-      borderRadius: BorderRadius.circular(kind == ReleaseKind.artist ? size : r),
+      borderRadius: BorderRadius.circular(widget.kind == ReleaseKind.artist ? size : r),
       child: SizedBox(
         width: size,
         height: size,
-        child: url.isEmpty
+        child: widget.url.isEmpty
             ? placeholder
             : Image.network(
-                url,
+                widget.url,
                 width: size,
                 height: size,
                 fit: BoxFit.cover,
-                cacheWidth: (size * dpr).round(),
+                gaplessPlayback: true,
+                filterQuality: FilterQuality.medium,
+                cacheWidth: coverDecodeSize(size, dpr),
                 errorBuilder: (_, _, _) => placeholder,
-                frameBuilder: (context, child, frame, sync) => sync
-                    ? child
-                    : AnimatedSwitcher(
-                        duration: motion(context, const Duration(milliseconds: 250)),
-                        child: frame == null ? placeholder : child,
-                      ),
+                frameBuilder: (context, child, frame, sync) {
+                  if (frame != null) _shown = true;
+                  if (sync || _shown) return child;
+                  return AnimatedSwitcher(
+                    duration: motion(context, const Duration(milliseconds: 250)),
+                    child: frame == null ? placeholder : child,
+                  );
+                },
               ),
       ),
     );

@@ -15,6 +15,7 @@ import 'package:yamp/ui/player/library_view.dart';
 import 'package:yamp/ui/player/mini_player.dart';
 import 'package:yamp/ui/player/now_playing.dart';
 import 'package:yamp/ui/search_view.dart';
+import 'package:yamp/ui/widgets.dart';
 
 Future<(FakeCore, Controller, SilentEngine)> _open(WidgetTester tester, {Size size = const Size(1280, 860)}) async {
   tester.view.physicalSize = const Size(1280, 860);
@@ -269,6 +270,60 @@ void main() {
     p.pause();
     expect(sent.last, containsPair('cmd', 'playerPosition'));
     expect(sent.last, containsPair('on', true));
+  });
+
+  testWidgets('смена трека не дёргает кнопку и спиннер', (tester) async {
+    final sent = <Map<String, Object?>>[];
+    final engine = SilentEngine();
+    final p = PlayerState(sent.add, engine);
+    var changes = 0;
+    p.addListener(() => changes++);
+    Map<String, Object?> ev(String id) => {
+      'type': 'player',
+      'action': 'play',
+      'url': 'http://127.0.0.1/$id',
+      'track': {'id': id, 'title': 'Песня $id', 'durationMs': 180000},
+    };
+
+    p.receive(ev('1'));
+    engine.progress(const Duration(seconds: 179));
+    var flips = 0;
+    var last = p.playing;
+    p.addListener(() {
+      if (p.playing != last) flips++;
+      last = p.playing;
+    });
+    engine.progress(const Duration(seconds: 2));
+    expect(sent.last, containsPair('cmd', 'playerEnded'));
+    expect(p.playing, isTrue);
+    p.receive(ev('2'));
+    expect(p.playing, isTrue);
+    expect(flips, 0);
+
+    engine.buffer(true);
+    await tester.pump(const Duration(milliseconds: 200));
+    engine.buffer(false);
+    expect(p.buffering, isFalse);
+    engine.buffer(true);
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(p.buffering, isTrue);
+    engine.buffer(false);
+    expect(p.buffering, isFalse);
+
+    p.pause();
+    expect(p.playing, isFalse);
+    p.receive({...ev('2'), 'action': 'end'});
+    expect(p.playing, isFalse);
+    expect(changes, greaterThan(0));
+    p.dispose();
+  });
+
+  test('обложка декодируется ступенями, а не под каждый пиксель', () {
+    expect(coverDecodeSize(40, 1), 64);
+    expect(coverDecodeSize(300, 1), 512);
+    expect(coverDecodeSize(320, 1.5), 512);
+    expect(coverDecodeSize(360, 1.5), 1024);
+    expect(coverDecodeSize(4000, 2), 2048);
   });
 
   test('дни истории подписаны по-русски', () {
