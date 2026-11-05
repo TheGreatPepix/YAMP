@@ -15,6 +15,8 @@ type uiState struct {
 	PlayMobile  string `json:"playMobile"`
 	PlayNow     string `json:"playQuality"`
 	Metered     bool   `json:"metered"`
+	Crossfade   bool   `json:"crossfade"`
+	Fade        int    `json:"fade"`
 	Log         string `json:"log,omitempty"`
 }
 
@@ -35,6 +37,8 @@ func (g *App) emitState(withLog bool) {
 		PlayMobile:  string(g.cfg.mobileQuality()),
 		PlayNow:     string(g.cfg.playback(g.metered)),
 		Metered:     g.metered,
+		Crossfade:   g.cfg.crossfade(),
+		Fade:        g.cfg.fade(),
 	}
 	g.mu.Unlock()
 	if withLog {

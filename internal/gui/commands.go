@@ -39,6 +39,8 @@ type uiCommand struct {
 	Mobile      string   `json:"mobile"`
 	Metered     bool     `json:"metered"`
 	Discord     *bool    `json:"discord"`
+	Crossfade   *bool    `json:"crossfade"`
+	Fade        int      `json:"fade"`
 	Title       string   `json:"title"`
 	Artist      string   `json:"artist"`
 	Cover       string   `json:"cover"`
@@ -199,6 +201,13 @@ func (g *App) setPrefs(c uiCommand) {
 	if c.Discord != nil {
 		on := *c.Discord
 		g.cfg.Discord = &on
+	}
+	if c.Crossfade != nil {
+		on := *c.Crossfade
+		g.cfg.Crossfade = &on
+	}
+	if c.Fade != 0 {
+		g.cfg.Fade = clampFade(c.Fade)
 	}
 	err := g.cfg.save()
 	g.mu.Unlock()

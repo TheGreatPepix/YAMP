@@ -23,14 +23,16 @@ type config struct {
 	Quality     string `json:"quality"`
 	Concurrency int    `json:"concurrency"`
 
-	PlayQuality   string `json:"playQuality,omitempty"`
-	AutoQuality   *bool  `json:"autoQuality,omitempty"`
-	WifiQuality   string `json:"wifiQuality,omitempty"`
-	MobileQuality string `json:"mobileQuality,omitempty"`
-	Volume      *float64 `json:"volume,omitempty"`
-	Repeat      string   `json:"repeat,omitempty"`
-	Shuffle     bool     `json:"shuffle,omitempty"`
-	Discord     *bool    `json:"discord,omitempty"`
+	PlayQuality   string   `json:"playQuality,omitempty"`
+	AutoQuality   *bool    `json:"autoQuality,omitempty"`
+	WifiQuality   string   `json:"wifiQuality,omitempty"`
+	MobileQuality string   `json:"mobileQuality,omitempty"`
+	Volume        *float64 `json:"volume,omitempty"`
+	Repeat        string   `json:"repeat,omitempty"`
+	Shuffle       bool     `json:"shuffle,omitempty"`
+	Discord       *bool    `json:"discord,omitempty"`
+	Crossfade     *bool    `json:"crossfade,omitempty"`
+	Fade          int      `json:"fade,omitempty"`
 
 	Token    string `json:"token,omitempty"`
 	Refresh  string `json:"refresh,omitempty"`
@@ -100,6 +102,10 @@ func loadConfig() config {
 			c.Repeat = string(player.ParseRepeat(saved.Repeat))
 			c.Shuffle = saved.Shuffle
 			c.Discord = saved.Discord
+			c.Crossfade = saved.Crossfade
+			if saved.Fade != 0 {
+				c.Fade = clampFade(saved.Fade)
+			}
 		}
 	}
 	return c
@@ -107,6 +113,27 @@ func loadConfig() config {
 
 func clampConcurrency(n int) int {
 	return max(minConcurrency, min(maxConcurrency, n))
+}
+
+const (
+	minFade     = 1
+	maxFade     = 12
+	defaultFade = 6
+)
+
+func clampFade(n int) int {
+	return max(minFade, min(maxFade, n))
+}
+
+func (c config) crossfade() bool {
+	return c.Crossfade == nil || *c.Crossfade
+}
+
+func (c config) fade() int {
+	if c.Fade == 0 {
+		return defaultFade
+	}
+	return clampFade(c.Fade)
 }
 
 const defaultVolume = 0.8

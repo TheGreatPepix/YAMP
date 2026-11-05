@@ -5,7 +5,7 @@ import 'fake_player.dart';
 import 'fake_remote.dart';
 
 class FakeCore implements Core {
-  FakeCore({this.tick = const Duration(milliseconds: 120), this.latest = '0.1.8'});
+  FakeCore({this.tick = const Duration(milliseconds: 120), this.latest = '0.2.0'});
 
   final Duration tick;
   final String latest;
@@ -54,13 +54,18 @@ class FakeCore implements Core {
         'theme': _theme,
         'quality': _quality,
         'concurrency': _concurrency,
-        'version': '0.1.8',
+        'version': '0.2.0',
         'playAuto': _playAuto,
         'playManual': _playManual,
         'playWifi': _playWifi,
         'playMobile': _playMobile,
         'playQuality': _playAuto ? _playWifi : _playManual,
+        'crossfade': _crossfade,
+        'fade': _fade,
       };
+
+  var _crossfade = true;
+  var _fade = 6;
 
   var _playAuto = true;
   var _playManual = 'lossless';
@@ -76,7 +81,7 @@ class FakeCore implements Core {
         _emit(_state());
         _emit({'type': 'account', 'status': 'none'});
         player.emitPlayer();
-        if (latest != '0.1.8') _emit({..._update(), 'quiet': true});
+        if (latest != '0.2.0') _emit({..._update(), 'quiet': true});
       case 'checkUpdate':
         _later(tick, () => _emit(_update()));
       case 'applyUpdate':
@@ -173,6 +178,8 @@ class FakeCore implements Core {
         if (c['theme'] case final String t when t.isNotEmpty) _theme = t;
         if (c['quality'] case final String q when q.isNotEmpty) _quality = q;
         if (c['concurrency'] case final int n when n > 0) _concurrency = n;
+        if (c['crossfade'] case final bool on) _crossfade = on;
+        if (c['fade'] case final int n when n > 0) _fade = n;
         _emit(_state());
       case 'playQuality':
         playQuality.add(c);
@@ -211,13 +218,13 @@ class FakeCore implements Core {
 
   Map<String, Object?> _update() => {
         'type': 'update',
-        'current': '0.1.8',
+        'current': '0.2.0',
         'latest': latest,
         'page': 'https://github.com/TheGreatPepix/YAMP/releases/tag/v$latest',
-        'notes': latest == '0.1.8' ? '' : 'Самообновление из релизов GitHub.',
+        'notes': latest == '0.2.0' ? '' : 'Самообновление из релизов GitHub.',
         'published': '02.11.2026',
-        'available': latest != '0.1.8',
-        'canApply': latest != '0.1.8',
+        'available': latest != '0.2.0',
+        'canApply': latest != '0.2.0',
       };
 
   static (String, String, String, int, int) _release(String link) {

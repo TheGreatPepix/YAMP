@@ -257,6 +257,7 @@ class _Listening extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final detects = c.desktop.detectsNetwork;
+    final text = Theme.of(context).textTheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -299,6 +300,35 @@ class _Listening extends StatelessWidget {
           _QualityPick(icon: Icons.graphic_eq_rounded, title: 'Всегда', value: c.playManual, onChanged: c.setPlayManual),
           const SizedBox(height: 10),
           _Hint(qualityHint(c.playManual)),
+        ],
+        const SizedBox(height: 26),
+        const _Label('Переходы между треками'),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Плавные переходы'),
+          subtitle: const _Hint(
+            'Конец трека затихает, а следующий в это время набирает громкость. '
+            'Треки альбома играют встык, как задумано.',
+          ),
+          value: c.crossfade,
+          onChanged: c.setCrossfade,
+        ),
+        if (c.crossfade) ...[
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(child: Text('Длительность', style: text.bodyMedium)),
+              Text('${c.fade} с', style: text.titleMedium?.copyWith(color: context.status.accent)),
+            ],
+          ),
+          Slider(
+            min: 1,
+            max: 12,
+            divisions: 11,
+            value: c.fade.toDouble().clamp(1, 12),
+            label: '${c.fade} с',
+            onChanged: (v) => c.setFade(v.round()),
+          ),
         ],
         if (c.discordAvailable) ...[
           const SizedBox(height: 26),

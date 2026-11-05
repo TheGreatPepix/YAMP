@@ -13,7 +13,7 @@ import 'package:yamp/ui/search_view.dart';
 
 Future<(FakeCore, Controller)> _open(
   WidgetTester tester, {
-  String latest = '0.1.8',
+  String latest = '0.2.0',
   Duration tick = const Duration(milliseconds: 120),
 }) async {
   tester.view.physicalSize = const Size(1280, 860);
@@ -88,7 +88,7 @@ void main() {
     final (core, c) = await _open(tester);
 
     expect(c.ready, isTrue);
-    expect(c.version, '0.1.8');
+    expect(c.version, '0.2.0');
     expect(find.text('Войти через Яндекс'), findsOneWidget);
     expect(find.text('Моя волна'), findsNothing);
 
@@ -201,7 +201,7 @@ void main() {
     expect(find.text('Качество звука'), findsOneWidget);
     await tester.tap(find.text('О программе'));
     await tester.pumpAndSettle();
-    expect(find.text('Версия 0.1.8'), findsOneWidget);
+    expect(find.text('Версия 0.2.0'), findsOneWidget);
 
     await tester.tap(find.text('Проверить'));
     await tester.pump();
@@ -243,6 +243,34 @@ void main() {
     await tester.tap(find.byTooltip('Закрыть'));
     await tester.pumpAndSettle();
     expect(find.text('Одновременных загрузок'), findsNothing);
+    await core.close();
+  });
+
+  testWidgets('настройки: плавные переходы включены, длительность меняется, можно выключить', (tester) async {
+    final (core, c) = await _open(tester);
+    await _login(tester, 'good-token');
+    expect(c.player.crossfade, const Duration(seconds: 6));
+
+    await tester.tap(find.byTooltip('Настройки'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byType(Slider));
+    await tester.pumpAndSettle();
+    expect(find.text('6 с'), findsOneWidget);
+    await tester.drag(find.byType(Slider), const Offset(400, 0));
+    await tester.pumpAndSettle();
+    expect(c.fade, 12);
+    expect(c.player.crossfade, const Duration(seconds: 12));
+    expect(find.text('12 с'), findsOneWidget);
+
+    await tester.tap(find.text('Плавные переходы'));
+    await tester.pumpAndSettle();
+    expect(c.crossfade, isFalse);
+    expect(c.player.crossfade, Duration.zero);
+    expect(find.byType(Slider), findsNothing);
+
+    await tester.tap(find.text('Плавные переходы'));
+    await tester.pumpAndSettle();
+    expect(c.player.crossfade, const Duration(seconds: 12));
     await core.close();
   });
 

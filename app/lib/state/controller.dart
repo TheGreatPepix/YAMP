@@ -63,6 +63,8 @@ class Controller extends ChangeNotifier {
   var playMobile = PlayQuality.mp3;
   var playNow = PlayQuality.lossless;
   var metered = false;
+  var crossfade = true;
+  var fade = 6;
 
   UpdateInfo? update;
   var checkingUpdate = false;
@@ -243,6 +245,23 @@ class Controller extends ChangeNotifier {
     desktop.pin(pinned.value);
   }
 
+  void _applyFade() => player.crossfade = crossfade ? Duration(seconds: fade) : Duration.zero;
+
+  void setCrossfade(bool on) {
+    crossfade = on;
+    _applyFade();
+    send({'cmd': 'prefs', 'crossfade': on});
+    notifyListeners();
+  }
+
+  void setFade(int seconds) {
+    if (fade == seconds) return;
+    fade = seconds;
+    _applyFade();
+    send({'cmd': 'prefs', 'fade': seconds});
+    notifyListeners();
+  }
+
   void setDiscord(bool on) {
     discord = on;
     send({'cmd': 'prefs', 'discord': on});
@@ -399,6 +418,9 @@ class Controller extends ChangeNotifier {
         playMobile = q(ev['playMobile'], PlayQuality.mp3);
         playNow = q(ev['playQuality'], playManual);
         metered = ev['metered'] == true;
+        crossfade = ev['crossfade'] != false;
+        fade = (ev['fade'] as num?)?.toInt() ?? fade;
+        _applyFade();
         if (ev['log'] is String) log.value = ev['log'] as String;
         ready = true;
       case 'account':

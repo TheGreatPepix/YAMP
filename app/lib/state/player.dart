@@ -288,6 +288,8 @@ class PlayerState extends ChangeNotifier {
   PlayTrack? next;
   var art = '';
   var url = '';
+  var nextUrl = '';
+  var crossfade = Duration.zero;
   var pos = 0;
   var count = 0;
   var repeat = Repeat.off;
@@ -305,6 +307,7 @@ class PlayerState extends ChangeNotifier {
   var _engineOn = false;
   var _advancing = false;
   var _userPaused = false;
+  String? _handoff;
   var buffering = false;
   Timer? _bufferTimer;
 
@@ -464,6 +467,7 @@ class PlayerState extends ChangeNotifier {
     next = n is Map<String, dynamic> ? PlayTrack.fromJson(n) : null;
     art = _s(ev['art']);
     url = _s(ev['url']);
+    nextUrl = _s(ev['nextUrl']);
     pos = _i(ev['pos']);
     count = _i(ev['count']);
     repeat = Repeat.values.asNameMap()[_s(ev['repeat'])] ?? Repeat.off;
@@ -484,6 +488,7 @@ class PlayerState extends ChangeNotifier {
 
     final current = track;
     if (const {'play', 'resume', 'retry', 'stop', 'restore'}.contains(ev['action'])) _pending = null;
+    if (const {'play', 'resume', 'retry', 'stop', 'restore', 'end'}.contains(ev['action'])) _handoff = null;
     switch (ev['action']) {
       case 'play' when current != null:
         _startedFor = null;
@@ -593,6 +598,7 @@ class PlayerState extends ChangeNotifier {
       _reported = p;
       _send({'cmd': 'playerPosition', 'track': id, 'position': _seconds, 'playing': playing});
     }
+    _crossfade(p);
     if (id == null || _startedFor == id) return;
     if (p > _openedAt && p < _openedAt + const Duration(seconds: 3)) {
       _startedFor = id;
@@ -602,13 +608,35 @@ class PlayerState extends ChangeNotifier {
     }
   }
 
+  static const _preloadAhead = Duration(seconds: 20);
+  static const _shortestFade = Duration(milliseconds: 500);
+
+  void _crossfade(Duration p) {
+    final id = track?.id;
+    final fade = crossfade;
+    if (id == null || fade <= Duration.zero || _handoff != null || !_engineOn || _startedFor != id) return;
+    if (next == null || nextUrl.isEmpty || repeat == Repeat.one || source?.kind == 'album') return;
+    final total = duration.value;
+    if (total < fade * 3) return;
+    final left = total - p;
+    if (left > fade + _preloadAhead) return;
+    if (left > fade) {
+      engine.preload(nextUrl);
+      return;
+    }
+    if (left < _shortestFade) return;
+    _handoff = id;
+    engine.crossfade(nextUrl, left);
+    _send({'cmd': 'playerEnded', 'track': id, 'position': total.inMilliseconds / 1000});
+  }
+
   static const _cutSlack = Duration(seconds: 5);
 
   double get _seconds => position.value.inMilliseconds / 1000;
 
   void _onCompleted() {
     final id = track?.id;
-    if (id == null || _failedFor == id) return;
+    if (id == null || _failedFor == id || _handoff == id) return;
     final total = duration.value;
     if (_startedFor == id && total > _cutSlack * 2 && position.value < total - _cutSlack) {
       _failedFor = id;
@@ -622,7 +650,7 @@ class PlayerState extends ChangeNotifier {
 
   void _onError(String message) {
     final id = track?.id;
-    if (id == null || _startedFor == id || _failedFor == id) return;
+    if (id == null || _startedFor == id || _failedFor == id || _handoff == id) return;
     _failedFor = id;
     _send({'cmd': 'playerError', 'track': id, 'message': message, 'position': _seconds});
   }

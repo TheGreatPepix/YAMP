@@ -154,6 +154,7 @@ class FakePlayer {
       'track': cur == null ? null : _fresh(cur),
       if (cur != null) 'url': 'fake://track/${cur['id']}?q=$_quality',
       if (next != null) 'next': _fresh(next),
+      if (next != null) 'nextUrl': 'fake://track/${next['id']}?q=$_quality',
       'pos': _pos,
       'count': _queue.length,
       'repeat': _repeat,

@@ -239,6 +239,94 @@ void main() {
     expect(sent.last, containsPair('cmd', 'playerEnded'));
   });
 
+  group('плавный переход', () {
+    Map<String, Object?> ev(String action, String id, {String? next, String kind = 'playlist', String repeat = 'off'}) => {
+      'type': 'player',
+      'action': action,
+      'url': 'http://127.0.0.1/$id',
+      'nextUrl': ?(next == null ? null : 'http://127.0.0.1/$next'),
+      'next': ?(next == null ? null : {'id': next, 'title': 'Следующая', 'durationMs': 180000}),
+      'repeat': repeat,
+      'source': {'kind': kind, 'id': 'x'},
+      'track': {'id': id, 'title': 'Песня', 'durationMs': 180000},
+    };
+    Iterable<Map<String, Object?>> cmds(List<Map<String, Object?>> sent, String cmd) =>
+        sent.where((c) => c['cmd'] == cmd);
+
+    test('заранее грузит следующий трек, сводит и не открывает его заново', () {
+      final sent = <Map<String, Object?>>[];
+      final engine = SilentEngine();
+      final p = PlayerState(sent.add, engine)..crossfade = const Duration(seconds: 6);
+
+      p.receive(ev('play', '1', next: '2'));
+      engine.progress(const Duration(seconds: 1));
+      engine.progress(const Duration(seconds: 150));
+      expect(engine.preloaded, isNull);
+      engine.progress(const Duration(seconds: 5));
+      expect(engine.preloaded, 'http://127.0.0.1/2');
+      expect(engine.fades, isEmpty);
+
+      engine.progress(const Duration(seconds: 19));
+      expect(engine.fades, [('http://127.0.0.1/2', const Duration(seconds: 5))]);
+      expect(sent.last, {'cmd': 'playerEnded', 'track': '1', 'position': 180.0});
+
+      engine.progress(const Duration(seconds: 5));
+      expect(engine.isPlaying, isFalse);
+      expect(engine.fades, hasLength(1));
+      expect(cmds(sent, 'playerEnded'), hasLength(1));
+      expect(cmds(sent, 'playerError'), isEmpty);
+      expect(p.playing, isTrue);
+
+      final opens = engine.opens;
+      p.receive(ev('play', '2'));
+      expect(engine.opens, opens);
+      expect(engine.url, 'http://127.0.0.1/2');
+      expect(engine.isPlaying, isTrue);
+      engine.progress(const Duration(milliseconds: 500));
+      expect(sent.last, {'cmd': 'playerStarted', 'track': '2'});
+    });
+
+    test('пауза во время перехода отменяет его, и следующий трек открывается как обычно', () {
+      final sent = <Map<String, Object?>>[];
+      final engine = SilentEngine();
+      final p = PlayerState(sent.add, engine)..crossfade = const Duration(seconds: 6);
+
+      p.receive(ev('play', '1', next: '2'));
+      engine.progress(const Duration(seconds: 1));
+      engine.progress(const Duration(seconds: 176));
+      expect(engine.fades, hasLength(1));
+      p.pause();
+      expect(engine.fadingTo, isNull);
+
+      final opens = engine.opens;
+      p.receive(ev('play', '2'));
+      expect(engine.opens, opens + 1);
+    });
+
+    for (final (name, crossfade, kind, repeat, next) in [
+      ('выключен в настройках', Duration.zero, 'playlist', 'off', '2'),
+      ('в альбоме', const Duration(seconds: 6), 'album', 'off', '2'),
+      ('при повторе трека', const Duration(seconds: 6), 'playlist', 'one', '1'),
+      ('в конце очереди', const Duration(seconds: 6), 'playlist', 'off', null),
+    ]) {
+      test('не включается $name', () {
+        final sent = <Map<String, Object?>>[];
+        final engine = SilentEngine();
+        final p = PlayerState(sent.add, engine)..crossfade = crossfade;
+
+        p.receive(ev('play', '1', next: next, kind: kind, repeat: repeat));
+        engine.progress(const Duration(seconds: 1));
+        engine.progress(const Duration(seconds: 177));
+        expect(engine.preloaded, isNull);
+        expect(engine.fades, isEmpty);
+        expect(cmds(sent, 'playerEnded'), isEmpty);
+
+        engine.progress(const Duration(seconds: 2));
+        expect(cmds(sent, 'playerEnded'), hasLength(1));
+      });
+    }
+  });
+
   test('после перезапуска трек ждёт на том же месте и сохраняет позицию', () {
     final sent = <Map<String, Object?>>[];
     final engine = SilentEngine();

@@ -154,6 +154,14 @@ func TestCoreLifecycle(t *testing.T) {
 	if e := next(); e["type"] != "state" || e["theme"] != "light" || e["version"] != Version {
 		t.Fatalf("ждали state с темой light, пришло %v", e)
 	}
+	core.Send([]byte(`{"cmd":"prefs","crossfade":false,"fade":40}`))
+	if e := next(); e["crossfade"] != false || e["fade"] != float64(maxFade) {
+		t.Fatalf("ждали выключенные переходы и %d с, пришло %v", maxFade, e)
+	}
+	core.Send([]byte(`{"cmd":"prefs","crossfade":true}`))
+	if e := next(); e["crossfade"] != true || e["fade"] != float64(maxFade) {
+		t.Fatalf("переходы не включились обратно с прежней длиной: %v", e)
+	}
 
 	core.Close()
 	if e := next(); e["type"] != "exit" {
@@ -176,6 +184,18 @@ func TestCoreLifecycle(t *testing.T) {
 	case e := <-events:
 		t.Fatalf("событие после exit: %v", e)
 	case <-time.After(50 * time.Millisecond):
+	}
+}
+
+func TestCrossfadeDefaults(t *testing.T) {
+	c := defaultConfig()
+	if !c.crossfade() || c.fade() != defaultFade {
+		t.Fatalf("по умолчанию ждали переходы на %d с, а не %v %d", defaultFade, c.crossfade(), c.fade())
+	}
+	off := false
+	c.Crossfade, c.Fade = &off, -3
+	if c.crossfade() || c.fade() != minFade {
+		t.Fatalf("ждали выключенные переходы и %d с, а не %v %d", minFade, c.crossfade(), c.fade())
 	}
 }
 
