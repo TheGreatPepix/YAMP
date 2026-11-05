@@ -1,7 +1,7 @@
 name: yamp
 description: "YAMP, Yet Another Music Player: окно на Flutter поверх ядра ymcore."
 publish_to: 'none'
-version: 0.2.0+10
+version: 0.2.1+11
 
 environment:
   sdk: ^3.8.0

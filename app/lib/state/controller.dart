@@ -21,6 +21,12 @@ class Controller extends ChangeNotifier {
     _sub = core.events.listen(_receive);
     player.onBlocked = (message) => _notices.add(Notice(message, kind: NoticeKind.error));
     player.onShare = share;
+    player.divert = remote.divert;
+    remote.onDiverted = (sent) => _notices.add(
+      sent
+          ? Notice('Включаю на компьютере «${remote.linkName}»', kind: NoticeKind.ok)
+          : Notice('Нет связи с компьютером «${remote.linkName}», подключаюсь снова', kind: NoticeKind.error),
+    );
     player.panelOpen.addListener(() {
       if (player.panelOpen.value) downloadsOpen.value = false;
     });

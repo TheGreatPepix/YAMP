@@ -781,25 +781,38 @@ class PlayerState extends ChangeNotifier {
 
   void setAutoQuality() => _send({'cmd': 'playerQuality', 'quality': 'auto'});
 
+  bool Function(List<Map<String, Object?>> commands)? divert;
+
+  bool _diverted(List<Map<String, Object?>> commands) => divert?.call(commands) ?? false;
+
   void play(String source, {String? track, int index = 0}) {
-    if (_blocked()) return;
-    _send({'cmd': 'play', 'source': source, 'track': ?track, 'index': index});
+    final command = {'cmd': 'play', 'source': source, 'track': ?track, 'index': index};
+    if (_diverted([command]) || _blocked()) return;
+    _send(command);
   }
 
   void playShuffled(String source) {
+    final command = {'cmd': 'play', 'source': source, 'index': -1};
+    if (_diverted([
+      {'cmd': 'playerShuffle', 'on': true},
+      command,
+    ])) {
+      return;
+    }
     if (_blocked()) return;
     if (!shuffle) _send({'cmd': 'playerShuffle', 'on': true});
-    _send({'cmd': 'play', 'source': source, 'index': -1});
+    _send(command);
   }
 
   void playWave({String source = '', PlayTrack? track, String title = ''}) {
-    if (_blocked()) return;
-    _send({
+    final command = {
       'cmd': 'wave',
       if (source.isNotEmpty) 'source': source,
       'track': ?track?.id,
       'title': title.isNotEmpty ? title : (track?.title ?? ''),
-    });
+    };
+    if (_diverted([command]) || _blocked()) return;
+    _send(command);
   }
 
   void jump(int index) => _send({'cmd': 'playerJump', 'pos': index, 'position': _seconds});

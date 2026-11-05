@@ -176,6 +176,12 @@ class FakeRemote {
         _jump(_pos - 1);
       case 'playerJump':
         _jump((c['pos'] as num?)?.toInt() ?? _pos);
+      case 'play':
+        _playing = true;
+        _jump(((c['index'] as num?)?.toInt() ?? 0).clamp(0, _songs.length - 1));
+      case 'wave':
+        _playing = true;
+        _jump(0);
       case 'playerShuffle':
         _shuffle = c['on'] == true;
         _player();

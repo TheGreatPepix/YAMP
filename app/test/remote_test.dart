@@ -301,4 +301,128 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     c.dispose();
   });
+
+  test('выбор музыки: запуск уходит на компьютер, а без режима играет телефон', () async {
+    final core = _ScriptCore();
+    final c = Controller(core, engine: SilentEngine());
+    addTearDown(c.dispose);
+    final notices = <String>[];
+    final sub = c.notices.listen((n) => notices.add(n.message));
+    addTearDown(sub.cancel);
+    final r = c.remote;
+    List<Object?> remoteCommands(int from) => [
+      for (final s in core.sent.skip(from))
+        if (s['cmd'] == 'remoteSend') s['command'],
+    ];
+
+    c.player.play('liked', track: '7', index: 2);
+    expect(core.sent.last, {'cmd': 'play', 'source': 'liked', 'track': '7', 'index': 2});
+
+    r.browse();
+    expect(r.targeting, isFalse, reason: 'без компьютера режим не включается');
+
+    r.receive({
+      'type': 'remoteDevices',
+      'devices': [
+        {'id': 'pc', 'name': 'Комп', 'paired': true, 'online': true},
+      ],
+    });
+    r.connect(r.devices.single);
+    r.receive({'type': 'remoteLink', 'id': 'pc', 'name': 'Комп', 'status': 'online'});
+    r.browse();
+    expect(r.targeting, isTrue);
+
+    final before = core.sent.length;
+    c.player.play('https://music.yandex.ru/album/1', track: '5', index: 3);
+    c.player.playShuffled('https://music.yandex.ru/users/me/playlists/3');
+    c.player.playWave(source: 'https://music.yandex.ru/artist/9', title: 'Кино');
+    expect(remoteCommands(before), [
+      {'cmd': 'play', 'source': 'https://music.yandex.ru/album/1', 'track': '5', 'index': 3},
+      {'cmd': 'playerShuffle', 'on': true},
+      {'cmd': 'play', 'source': 'https://music.yandex.ru/users/me/playlists/3', 'index': -1},
+      {'cmd': 'wave', 'source': 'https://music.yandex.ru/artist/9', 'title': 'Кино'},
+    ]);
+    expect(
+      core.sent.skip(before).where((s) => s['cmd'] != 'remoteSend'),
+      isEmpty,
+      reason: 'локальный плеер не трогаем',
+    );
+
+    await Future<void>.delayed(Duration.zero);
+    expect(notices, hasLength(3));
+    expect(notices, everyElement('Включаю на компьютере «Комп»'));
+
+    r.receive({'type': 'remoteLink', 'id': 'pc', 'status': 'offline', 'message': 'нет связи'});
+    final offline = core.sent.length;
+    c.player.play('chart');
+    expect(core.sent.length, offline, reason: 'без связи команда никуда не уходит');
+    await Future<void>.delayed(Duration.zero);
+    expect(notices.last, contains('Нет связи'));
+
+    r.disconnect();
+    expect(r.targeting, isFalse);
+    c.player.play('chart');
+    expect(core.sent.last, {'cmd': 'play', 'source': 'chart', 'index': 0});
+  });
+
+  testWidgets('телефон: «Выбрать музыку» оставляет связь и показывает полосу компьютера', (tester) async {
+    _size(tester, const Size(400, 860));
+    final core = FakeCore();
+    final c = Controller(core);
+    await tester.pumpWidget(
+      _app(
+        Scaffold(
+          body: Column(
+            children: [
+              Expanded(
+                child: Builder(
+                  builder: (context) => Center(
+                    child: TextButton(onPressed: () => openRemote(context, c), child: const Text('Открыть пульт')),
+                  ),
+                ),
+              ),
+              RemoteBar(c: c),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Открыть пульт'));
+    await _settle(tester);
+    c.remote.pair(fakePairLink);
+    await _settle(tester);
+    expect(find.text('Ветер'), findsWidgets);
+
+    final pick = find.text('Выбрать музыку');
+    await tester.scrollUntilVisible(pick, 200, scrollable: find.byType(Scrollable).first);
+    await tester.tap(pick);
+    await _settle(tester);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(RemotePage), findsNothing);
+    expect(c.remote.connected, isTrue, reason: 'уход с пульта не рвёт связь');
+    expect(find.text(FakeRemote.pcName), findsOneWidget);
+    expect(find.text('Выбранная музыка включится на компьютере'), findsOneWidget);
+
+    c.player.play('https://music.yandex.ru/album/1', index: 2);
+    await _settle(tester);
+    expect(core.remote.sent.last, {'cmd': 'play', 'source': 'https://music.yandex.ru/album/1', 'index': 2});
+
+    await tester.tap(find.text(FakeRemote.pcName));
+    await _settle(tester);
+    expect(find.byType(RemotePage), findsOneWidget);
+    expect(find.text('Город золотой'), findsWidgets);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.byType(RemotePage), findsNothing);
+    expect(c.remote.connected, isTrue, reason: 'назад из пульта в режиме выбора музыки тоже не рвёт связь');
+
+    await tester.tap(find.byTooltip('Отключить пульт'));
+    await _settle(tester);
+    expect(c.remote.linkId, isEmpty);
+    expect(find.text('Выбранная музыка включится на компьютере'), findsNothing);
+
+    await tester.pumpWidget(const SizedBox());
+    c.dispose();
+  });
 }

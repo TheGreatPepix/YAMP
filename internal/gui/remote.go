@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"yamp/internal/remote"
+	"yamp/internal/yam"
 )
 
 const (
@@ -27,6 +28,9 @@ const (
 	remoteRetryMax    = 10 * time.Second
 	remoteDialFor     = 8 * time.Second
 	remoteNameMax     = 64
+	remoteSourceMax   = 512
+	remoteTitleMax    = 200
+	remoteIndexMax    = 100000
 
 	linkIdle       = "idle"
 	linkPairing    = "pairing"
@@ -497,6 +501,53 @@ type remoteRequest struct {
 	On       bool     `json:"on"`
 	Repeat   string   `json:"repeat"`
 	Volume   *float64 `json:"volume"`
+	Source   string   `json:"source"`
+	Index    *int     `json:"index"`
+	Title    string   `json:"title"`
+}
+
+func remoteTrack(id string) bool {
+	if id == "" {
+		return true
+	}
+	if len(id) > 20 {
+		return false
+	}
+	for _, r := range id {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+func remoteLink(source string) bool {
+	if len(source) > remoteSourceMax || strings.ContainsAny(source, "\r\n\t ") {
+		return false
+	}
+	_, err := yam.ParseLink(source)
+	return err == nil
+}
+
+func remoteSource(source string) bool {
+	switch source {
+	case sourceWave, sourceLiked, sourceHistory, yam.ChartLink:
+		return true
+	}
+	return remoteLink(source)
+}
+
+func remoteTitle(title string) string {
+	title = strings.TrimSpace(strings.Map(func(r rune) rune {
+		if r < ' ' {
+			return -1
+		}
+		return r
+	}, title))
+	if r := []rune(title); len(r) > remoteTitleMax {
+		title = string(r[:remoteTitleMax])
+	}
+	return title
 }
 
 func translateRemote(line []byte, current string, position float64) (remoteAction, bool) {
@@ -528,6 +579,23 @@ func translateRemote(line []byte, current string, position float64) (remoteActio
 		return remoteAction{core: map[string]any{"cmd": r.Cmd, "repeat": r.Repeat}}, true
 	case "playerShuffle":
 		return remoteAction{core: map[string]any{"cmd": r.Cmd, "on": r.On}}, true
+	case "play":
+		if !remoteSource(r.Source) || !remoteTrack(r.Track) {
+			return remoteAction{}, false
+		}
+		index := 0
+		if r.Index != nil {
+			index = *r.Index
+		}
+		if index < -1 || index > remoteIndexMax {
+			return remoteAction{}, false
+		}
+		return remoteAction{core: map[string]any{"cmd": r.Cmd, "source": r.Source, "track": r.Track, "index": index}}, true
+	case "wave":
+		if (r.Source != "" && !remoteLink(r.Source)) || !remoteTrack(r.Track) || (r.Source == "" && r.Track == "") {
+			return remoteAction{}, false
+		}
+		return remoteAction{core: map[string]any{"cmd": r.Cmd, "source": r.Source, "track": r.Track, "title": remoteTitle(r.Title)}}, true
 	case "playerState", "queue":
 		return remoteAction{core: map[string]any{"cmd": r.Cmd}}, true
 	case "pause", "resume":

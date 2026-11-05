@@ -27,6 +27,15 @@ func TestRemoteAllowlist(t *testing.T) {
 		`{"cmd":"seek","position":12.5}`:             `{"action":"seek","position":12.5,"type":"remote"}`,
 		`{"cmd":"volume","volume":7}`:                `{"action":"volume","type":"remote","volume":1}`,
 		`{"cmd":"playerNext","token":"t","dir":"/"}`: `{"cmd":"playerNext","position":42,"track":"1"}`,
+
+		`{"cmd":"play","source":"wave"}`:                                                `{"cmd":"play","index":0,"source":"wave","track":""}`,
+		`{"cmd":"play","source":"liked","track":"123","index":4}`:                       `{"cmd":"play","index":4,"source":"liked","track":"123"}`,
+		`{"cmd":"play","source":"history","index":-1}`:                                  `{"cmd":"play","index":-1,"source":"history","track":""}`,
+		`{"cmd":"play","source":"chart","seeds":["user:x"]}`:                            `{"cmd":"play","index":0,"source":"chart","track":""}`,
+		`{"cmd":"play","source":"https://music.yandex.ru/album/5/track/6","track":"6"}`: `{"cmd":"play","index":0,"source":"https://music.yandex.ru/album/5/track/6","track":"6"}`,
+		`{"cmd":"play","source":"https://music.yandex.ru/artist/9/tracks"}`:             `{"cmd":"play","index":0,"source":"https://music.yandex.ru/artist/9/tracks","track":""}`,
+		`{"cmd":"wave","source":"https://music.yandex.ru/artist/9","title":" Кино\n"}`:  `{"cmd":"wave","source":"https://music.yandex.ru/artist/9","title":"Кино","track":""}`,
+		`{"cmd":"wave","track":"77"}`:                                                   `{"cmd":"wave","source":"","title":"","track":"77"}`,
 	}
 	for in, want := range allowed {
 		act, ok := translateRemote([]byte(in), "1", 42)
@@ -48,7 +57,14 @@ func TestRemoteAllowlist(t *testing.T) {
 	}
 
 	denied := []string{
-		`{"cmd":"play","source":"wave"}`, `{"cmd":"wave"}`, `{"cmd":"login","token":"x"}`, `{"cmd":"logout"}`,
+		`{"cmd":"play"}`, `{"cmd":"play","source":"home"}`, `{"cmd":"play","source":"https://evil.example.com/album/1"}`,
+		`{"cmd":"play","source":"C:\\Windows"}`, `{"cmd":"play","source":"playlist:1"}`, `{"cmd":"play","source":"wave","track":"12a"}`,
+		`{"cmd":"play","source":"wave","track":"../1"}`, `{"cmd":"play","source":"wave","track":"123456789012345678901"}`,
+		`{"cmd":"play","source":"wave","index":-2}`, `{"cmd":"play","source":"wave","index":100001}`,
+		`{"cmd":"play","source":"https://music.yandex.ru/album/1 x"}`,
+		`{"cmd":"play","source":"https://music.yandex.ru/album/1?` + strings.Repeat("a", 600) + `"}`,
+		`{"cmd":"wave"}`, `{"cmd":"wave","source":"liked"}`, `{"cmd":"wave","source":"wave"}`, `{"cmd":"wave","track":"x"}`,
+		`{"cmd":"login","token":"x"}`, `{"cmd":"logout"}`,
 		`{"cmd":"exit"}`, `{"cmd":"prefs","dir":"C:\\"}`, `{"cmd":"download","link":"x"}`, `{"cmd":"cancel"}`,
 		`{"cmd":"applyUpdate"}`, `{"cmd":"checkUpdate"}`, `{"cmd":"deviceLogin"}`, `{"cmd":"recheck"}`,
 		`{"cmd":"playerEnded","track":"1"}`, `{"cmd":"playerStarted","track":"1"}`, `{"cmd":"playerError","track":"1"}`,
@@ -304,6 +320,13 @@ func TestRemotePhone(t *testing.T) {
 	if ev := pcLog.wait(t, "remote", nil); ev["action"] != "pause" {
 		t.Fatalf("пауза с телефона: %v", ev)
 	}
+
+	send(phone, map[string]any{"cmd": "remoteSend", "command": map[string]any{"cmd": "play", "source": "wave"}})
+	pcLog.wait(t, "player", playing("1", "play"))
+	remoteEvent("player", func(ev map[string]any) bool {
+		tr, _ := ev["track"].(map[string]any)
+		return tr != nil && tr["id"] == "1"
+	})
 
 	send(phone, map[string]any{"cmd": "remoteDisconnect"})
 	phoneLog.wait(t, "remoteLink", func(ev map[string]any) bool { return ev["status"] == linkIdle })

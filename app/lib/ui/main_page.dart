@@ -93,6 +93,7 @@ class MainPage extends StatelessWidget {
                               ),
                             Divider(height: 1, color: scheme.outlineVariant),
                             Expanded(child: body),
+                            RemoteBar(c: c),
                             FocusTraversalGroup(
                               child: MiniPlayer(
                                 p: c.player,

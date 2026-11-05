@@ -37,7 +37,7 @@ class _RemotePageState extends State<RemotePage> {
   @override
   void dispose() {
     r.scan(false);
-    if (r.linkId.isNotEmpty) r.disconnect();
+    if (r.linkId.isNotEmpty && !r.target) r.disconnect();
     widget.c.desktop.listenLan(false);
     super.dispose();
   }
@@ -57,7 +57,7 @@ class _RemotePageState extends State<RemotePage> {
       builder: (context, _) {
         final linked = r.linkId.isNotEmpty && r.status != LinkStatus.failed;
         return PopScope(
-          canPop: !linked,
+          canPop: !linked || r.target,
           onPopInvokedWithResult: (didPop, _) {
             if (!didPop) r.disconnect();
           },
@@ -71,6 +71,70 @@ class _RemotePageState extends State<RemotePage> {
             ),
             body: SafeArea(
               child: linked ? _Control(r: r) : _Devices(r: r, onScan: _scan),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class RemoteBar extends StatelessWidget {
+  const RemoteBar({super.key, required this.c});
+
+  final Controller c;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: c.remote,
+      builder: (context, _) {
+        final r = c.remote;
+        if (!r.targeting) return const SizedBox.shrink();
+        final scheme = Theme.of(context).colorScheme;
+        final note = switch (r.status) {
+          LinkStatus.online => 'Выбранная музыка включится на компьютере',
+          LinkStatus.offline => 'Нет связи, подключаюсь снова',
+          _ => 'Подключаюсь…',
+        };
+        return Material(
+          color: scheme.primaryContainer,
+          child: InkWell(
+            onTap: () => openRemote(context, c),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 6, 4, 6),
+              child: Row(
+                children: [
+                  Icon(Icons.computer_rounded, color: scheme.onPrimaryContainer),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          r.linkName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: scheme.onPrimaryContainer, fontWeight: FontWeight.w600),
+                        ),
+                        Text(
+                          note,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: scheme.onPrimaryContainer, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Отключить пульт',
+                    color: scheme.onPrimaryContainer,
+                    icon: const Icon(Icons.close_rounded),
+                    onPressed: r.disconnect,
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -289,6 +353,17 @@ class _Control extends StatelessWidget {
               _Volume(r: r),
               const SizedBox(height: 12),
               if (t != null) _Marks(r: r, track: t),
+              const SizedBox(height: 16),
+              Center(
+                child: FilledButton.tonalIcon(
+                  onPressed: () {
+                    r.browse();
+                    Navigator.of(context).pop();
+                  },
+                  icon: const Icon(Icons.library_music_rounded),
+                  label: const Text('Выбрать музыку'),
+                ),
+              ),
               if (r.queue.isNotEmpty) ...[const SizedBox(height: 20), const _Heading('Очередь'), _Queue(r: r)],
             ],
           ),

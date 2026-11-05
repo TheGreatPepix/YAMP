@@ -94,6 +94,29 @@ class RemoteState extends ChangeNotifier {
 
   bool get connected => status == LinkStatus.online;
 
+  var target = false;
+
+  void Function(bool sent)? onDiverted;
+
+  bool get targeting => target && linkId.isNotEmpty;
+
+  void browse() {
+    if (linkId.isEmpty) return;
+    target = true;
+    notifyListeners();
+  }
+
+  bool divert(List<Map<String, Object?>> commands) {
+    if (!targeting) return false;
+    if (connected) {
+      for (final c in commands) {
+        _command(c);
+      }
+    }
+    onDiverted?.call(connected);
+    return true;
+  }
+
   bool get busy => status == LinkStatus.pairing || status == LinkStatus.connecting;
 
   void scan(bool on) => _send({'cmd': 'remoteScan', 'on': on});
@@ -120,6 +143,7 @@ class RemoteState extends ChangeNotifier {
     _send({'cmd': 'remoteDisconnect'});
     _reset();
     linkId = '';
+    target = false;
     status = LinkStatus.idle;
     notifyListeners();
   }
@@ -129,6 +153,7 @@ class RemoteState extends ChangeNotifier {
     if (d.id == linkId) {
       _reset();
       linkId = '';
+      target = false;
       status = LinkStatus.idle;
     }
     devices = [
@@ -307,6 +332,7 @@ class RemoteState extends ChangeNotifier {
       if (id == linkId) {
         status = LinkStatus.idle;
         linkId = '';
+        target = false;
       }
       return;
     }
@@ -318,6 +344,7 @@ class RemoteState extends ChangeNotifier {
     if (_s(ev['name']).isNotEmpty) linkName = _s(ev['name']);
     status = next;
     linkMessage = _s(ev['message']);
+    if (next == LinkStatus.failed) target = false;
     if (next != LinkStatus.online) {
       _ticker?.cancel();
       _ticker = null;
