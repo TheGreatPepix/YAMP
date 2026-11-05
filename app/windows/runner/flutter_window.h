@@ -39,7 +39,6 @@ class FlutterWindow : public Win32Window {
   void EnterCompact(int width, int height);
   void LeaveCompact();
   void Pin(bool on);
-  SIZE CompactFrame();
 
   void AddTrayIcon();
   void RemoveTrayIcon();
@@ -54,6 +53,9 @@ class FlutterWindow : public Win32Window {
   bool pinned_ = false;
   int compact_width_ = 0, compact_height_ = 0;
   int compact_min_width_ = 380, compact_min_height_ = 168;
+  bool has_compact_pos_ = false;
+  bool placing_ = false;
+  POINT compact_pos_ = {};
   LONG_PTR saved_style_ = 0;
   WINDOWPLACEMENT saved_place_ = {sizeof(WINDOWPLACEMENT)};
   bool active_ = false;

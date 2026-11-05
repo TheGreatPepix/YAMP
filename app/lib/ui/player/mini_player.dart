@@ -118,7 +118,8 @@ class _Desktop extends StatelessWidget {
       builder: (context, box) {
         final wide = box.maxWidth >= 1100;
         final roomy = box.maxWidth >= 820;
-        final spacious = box.maxWidth >= 1240;
+        final slider = box.maxWidth >= (onCompact != null ? 1180 : 1100);
+        final quality = box.maxWidth >= (onCompact != null ? 900 : 820);
         return Container(
           constraints: const BoxConstraints(minHeight: 80),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -149,7 +150,7 @@ class _Desktop extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 16),
+              SizedBox(width: roomy ? 16 : 12),
               SizedBox(
                 width: wide ? 440 : (roomy ? 300 : 252),
                 child: Column(
@@ -171,14 +172,14 @@ class _Desktop extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 16),
+              SizedBox(width: roomy ? 16 : 12),
               Expanded(
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    if (roomy) Flexible(child: QualityMenu(p: p)),
-                    if (wide) VolumeControl(p: p) else _MuteOnly(p: p),
-                    if (onCompact != null && spacious)
+                    if (quality) Flexible(child: QualityMenu(p: p)),
+                    if (slider) VolumeControl(p: p) else _MuteOnly(p: p),
+                    if (onCompact != null)
                       IconButton(
                         tooltip: 'Мини-плеер',
                         onPressed: onCompact,

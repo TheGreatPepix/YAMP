@@ -82,6 +82,13 @@ class NowPlaying extends StatelessWidget {
                       ),
                     );
                   }
+                  final compact = onCompact == null || phone
+                      ? null
+                      : IconButton(
+                          tooltip: 'Мини-плеер',
+                          icon: const Icon(Icons.picture_in_picture_alt_rounded),
+                          onPressed: onCompact,
+                        );
                   final menu = TrackMenu(
                     track: t,
                     onOpen: onOpen,
@@ -95,13 +102,9 @@ class NowPlaying extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         _ViewSwitch(p: p, track: t),
-                        if (onCompact != null) ...[
+                        if (compact != null) ...[
                           const SizedBox(width: 4),
-                          IconButton(
-                            tooltip: 'Мини-плеер',
-                            icon: const Icon(Icons.picture_in_picture_alt_rounded),
-                            onPressed: onCompact,
-                          ),
+                          compact,
                         ],
                       ],
                     );
@@ -126,7 +129,7 @@ class NowPlaying extends StatelessWidget {
                             edge: edge,
                           );
                   }
-                  if (lyrics) return _NarrowLyrics(p: p, track: t, phone: phone, onOpen: onOpen);
+                  if (lyrics) return _NarrowLyrics(p: p, track: t, phone: phone, onOpen: onOpen, compact: compact);
                   return SingleChildScrollView(
                     padding: EdgeInsets.symmetric(horizontal: phone ? 0 : side),
                     child: _NarrowCover(
@@ -137,6 +140,7 @@ class NowPlaying extends StatelessWidget {
                       onOpen: onOpen,
                       menu: menu,
                       onQueue: () => _openQueue(context),
+                      compact: compact,
                     ),
                   );
                 },
@@ -585,6 +589,7 @@ class _NarrowCover extends StatelessWidget {
     required this.onOpen,
     required this.menu,
     required this.onQueue,
+    this.compact,
   });
 
   final PlayerState p;
@@ -594,6 +599,7 @@ class _NarrowCover extends StatelessWidget {
   final OpenPage onOpen;
   final Widget menu;
   final VoidCallback onQueue;
+  final Widget? compact;
 
   @override
   Widget build(BuildContext context) {
@@ -633,7 +639,15 @@ class _NarrowCover extends StatelessWidget {
             : Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _Header(p: p, onOpen: onOpen, trailing: _QueueButton(onPressed: onQueue)),
+                  _Header(
+                    p: p,
+                    onOpen: onOpen,
+                    edge: compact != null ? 96 : 48,
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [?compact, _QueueButton(onPressed: onQueue)],
+                    ),
+                  ),
                   _BigCover(p: p, track: track, size: (w * 0.62).clamp(120.0, 360.0)),
                   const SizedBox(height: 24),
                 ],
@@ -779,12 +793,13 @@ class _Actions extends StatelessWidget {
 }
 
 class _NarrowLyrics extends StatelessWidget {
-  const _NarrowLyrics({required this.p, required this.track, required this.phone, required this.onOpen});
+  const _NarrowLyrics({required this.p, required this.track, required this.phone, required this.onOpen, this.compact});
 
   final PlayerState p;
   final PlayTrack track;
   final bool phone;
   final OpenPage onOpen;
+  final Widget? compact;
 
   @override
   Widget build(BuildContext context) {
@@ -815,6 +830,7 @@ class _NarrowLyrics extends StatelessWidget {
                   ),
                   if (p.wave) DislikeButton(p: p, track: track, size: 44),
                   LikeButton(p: p, track: track, size: 44),
+                  ?compact,
                 ],
               ),
               const SizedBox(height: 12),

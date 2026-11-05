@@ -118,33 +118,36 @@ class _LyricsViewState extends State<LyricsView> {
         final edge = l.synced ? box.maxHeight * 0.3 : 8.0;
         return NotificationListener<ScrollNotification>(
           onNotification: _onScroll,
-          child: SingleChildScrollView(
-            controller: _scroll,
-            padding: EdgeInsets.symmetric(vertical: edge),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (var i = 0; i < l.lines.length; i++)
-                  _Line(
-                    key: _keys[i],
-                    line: l.lines[i],
-                    size: size,
-                    color: !l.synced
-                        ? white.withValues(alpha: 0.86)
-                        : i == _line
-                        ? white
-                        : (i < _line ? white.withValues(alpha: 0.38) : white.withValues(alpha: 0.6)),
-                    onTap: l.synced ? () => p.seek(l.lines[i].at!) : null,
-                  ),
-                if (l.writers.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 24),
-                    child: Text(
-                      'Авторы: ${l.writers.join(', ')}',
-                      style: TextStyle(fontSize: 13, color: white.withValues(alpha: 0.62)),
+          child: ScrollConfiguration(
+            behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+            child: SingleChildScrollView(
+              controller: _scroll,
+              padding: EdgeInsets.symmetric(vertical: edge),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (var i = 0; i < l.lines.length; i++)
+                    _Line(
+                      key: _keys[i],
+                      line: l.lines[i],
+                      size: size,
+                      color: !l.synced
+                          ? white.withValues(alpha: 0.86)
+                          : i == _line
+                          ? white
+                          : (i < _line ? white.withValues(alpha: 0.38) : white.withValues(alpha: 0.6)),
+                      onTap: l.synced ? () => p.seek(l.lines[i].at!) : null,
                     ),
-                  ),
-              ],
+                  if (l.writers.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 24),
+                      child: Text(
+                        'Авторы: ${l.writers.join(', ')}',
+                        style: TextStyle(fontSize: 13, color: white.withValues(alpha: 0.62)),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         );

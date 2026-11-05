@@ -227,14 +227,6 @@ void FlutterWindow::ShowWindowNow() {
   }
 }
 
-SIZE FlutterWindow::CompactFrame() {
-  HWND hwnd = GetHandle();
-  HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
-  double scale = FlutterDesktopGetDpiForMonitor(monitor) / 96.0;
-  return {static_cast<LONG>(compact_width_ * scale),
-          static_cast<LONG>(compact_height_ * scale)};
-}
-
 void FlutterWindow::EnterCompact(int width, int height) {
   HWND hwnd = GetHandle();
   if (!hwnd) {
@@ -257,22 +249,44 @@ void FlutterWindow::EnterCompact(int width, int height) {
     DWORD corner = kCornerRound;
     DwmSetWindowAttribute(hwnd, kCornerPreference, &corner, sizeof(corner));
   }
-  SIZE size = CompactFrame();
-  HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+  HMONITOR monitor = has_compact_pos_
+                         ? MonitorFromPoint(compact_pos_, MONITOR_DEFAULTTONULL)
+                         : nullptr;
+  bool restore = monitor != nullptr;
+  if (!restore) {
+    monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+  }
+  double scale = FlutterDesktopGetDpiForMonitor(monitor) / 96.0;
+  SIZE size = {static_cast<LONG>(compact_width_ * scale),
+               static_cast<LONG>(compact_height_ * scale)};
   MONITORINFO info = {sizeof(info)};
   GetMonitorInfoW(monitor, &info);
-  LONG margin =
-      static_cast<LONG>(24 * FlutterDesktopGetDpiForMonitor(monitor) / 96.0);
-  LONG x = info.rcWork.right - size.cx - margin;
-  LONG y = info.rcWork.bottom - size.cy - margin;
+  LONG x, y;
+  if (restore) {
+    x = (std::max)(info.rcWork.left,
+                   (std::min)(compact_pos_.x, info.rcWork.right - size.cx));
+    y = (std::max)(info.rcWork.top,
+                   (std::min)(compact_pos_.y, info.rcWork.bottom - size.cy));
+  } else {
+    LONG margin = static_cast<LONG>(24 * scale);
+    x = info.rcWork.right - size.cx - margin;
+    y = info.rcWork.bottom - size.cy - margin;
+  }
+  placing_ = true;
   SetWindowPos(hwnd, nullptr, x, y, size.cx, size.cy,
                SWP_NOZORDER | SWP_FRAMECHANGED | SWP_SHOWWINDOW);
+  placing_ = false;
 }
 
 void FlutterWindow::LeaveCompact() {
   HWND hwnd = GetHandle();
   if (!hwnd || !compact_) {
     return;
+  }
+  RECT rect;
+  if (GetWindowRect(hwnd, &rect)) {
+    compact_pos_ = {rect.left, rect.top};
+    has_compact_pos_ = true;
   }
   Pin(false);
   compact_ = false;
@@ -389,9 +403,7 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
       return 0;
     case WM_GETMINMAXINFO:
       if (compact_) {
-        double scale = FlutterDesktopGetDpiForMonitor(
-                           MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST)) /
-                       96.0;
+        double scale = GetDpiForWindow(hwnd) / 96.0;
         auto info = reinterpret_cast<MINMAXINFO*>(lparam);
         info->ptMinTrackSize.x = static_cast<LONG>(compact_min_width_ * scale);
         info->ptMinTrackSize.y = static_cast<LONG>(compact_min_height_ * scale);
@@ -406,12 +418,18 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
       }
       break;
     case WM_SIZE:
-      if (compact_ && wparam != SIZE_MINIMIZED) {
-        double scale = FlutterDesktopGetDpiForMonitor(
-                           MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST)) /
-                       96.0;
+      if (compact_ && !placing_ && wparam != SIZE_MINIMIZED) {
+        double scale = GetDpiForWindow(hwnd) / 96.0;
         compact_width_ = static_cast<int>(LOWORD(lparam) / scale + 0.5);
         compact_height_ = static_cast<int>(HIWORD(lparam) / scale + 0.5);
+      }
+      break;
+    case WM_DPICHANGED:
+      if (compact_) {
+        double scale = HIWORD(wparam) / 96.0;
+        auto rect = reinterpret_cast<RECT*>(lparam);
+        rect->right = rect->left + static_cast<LONG>(compact_width_ * scale);
+        rect->bottom = rect->top + static_cast<LONG>(compact_height_ * scale);
       }
       break;
     case WM_CLOSE:

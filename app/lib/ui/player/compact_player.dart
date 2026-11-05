@@ -35,45 +35,57 @@ class CompactPlayer extends StatelessWidget {
     final p = c.player;
     final t = p.track;
     final pinned = c.pinned.value;
-    final art = (box.maxHeight - 116).clamp(52.0, 160.0);
     final volume = (box.maxWidth - 300).clamp(56.0, 160.0);
+    const corner = VisualDensity(horizontal: -2, vertical: -2);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onPanStart: (_) => c.desktop.drag(),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 10, 4, 0),
-            child: Row(
-              children: [
-                if (t != null)
-                  Cover(url: t.cover, size: art, radius: 8, kind: ReleaseKind.track)
-                else
-                  SizedBox.square(dimension: art),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: t == null
-                      ? Text('Ничего не играет', style: TextStyle(color: scheme.onSurfaceVariant))
-                      : Semantics(liveRegion: true, child: TrackText(track: t)),
-                ),
-                IconButton(
-                  tooltip: pinned ? 'Открепить от верха' : 'Поверх всех окон',
-                  isSelected: pinned,
-                  onPressed: c.togglePin,
-                  icon: const Icon(Icons.push_pin_outlined),
-                  selectedIcon: Icon(Icons.push_pin_rounded, color: context.status.accent),
-                ),
-                IconButton(
-                  tooltip: 'Развернуть окно',
-                  onPressed: () => c.setCompact(false),
-                  icon: const Icon(Icons.open_in_full_rounded),
-                ),
-              ],
+        Expanded(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onPanStart: (_) => c.desktop.drag(),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 4, 4),
+              child: LayoutBuilder(
+                builder: (context, area) {
+                  final art = area.maxHeight.clamp(40.0, area.maxWidth * 0.42);
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (t != null)
+                        Cover(url: t.cover, size: art, radius: 8, kind: ReleaseKind.track)
+                      else
+                        SizedBox.square(dimension: art),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: t == null
+                              ? Text('Ничего не играет', style: TextStyle(color: scheme.onSurfaceVariant))
+                              : Semantics(liveRegion: true, child: TrackText(track: t, big: art >= 140)),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: pinned ? 'Открепить от верха' : 'Поверх всех окон',
+                        visualDensity: corner,
+                        isSelected: pinned,
+                        onPressed: c.togglePin,
+                        icon: const Icon(Icons.push_pin_outlined, size: 20),
+                        selectedIcon: Icon(Icons.push_pin_rounded, size: 20, color: context.status.accent),
+                      ),
+                      IconButton(
+                        tooltip: 'Развернуть окно',
+                        visualDensity: corner,
+                        onPressed: () => c.setCompact(false),
+                        icon: const Icon(Icons.open_in_full_rounded, size: 20),
+                      ),
+                    ],
+                  );
+                },
+              ),
             ),
           ),
         ),
-        const Spacer(),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8),
           child: Row(
