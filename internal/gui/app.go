@@ -29,6 +29,7 @@ type App struct {
 
 	player *playerState
 	stream *streamServer
+	remote *remoteHub
 
 	mu      sync.Mutex
 	cfg     config
@@ -56,7 +57,7 @@ type accountEvent struct {
 }
 
 func newApp() *App {
-	g := &App{cfg: loadConfig(), stream: newStreamServer()}
+	g := &App{cfg: loadConfig(), stream: newStreamServer(), remote: newRemoteHub()}
 	g.player = newPlayerState(g.cfg)
 	g.token = g.cfg.token()
 	g.account = accountEvent{Type: "account", Status: accNone}
@@ -67,6 +68,7 @@ func newApp() *App {
 func (g *App) start() {
 	g.jobs = newManager(g, g.cfg.Concurrency)
 	g.startUpdates()
+	g.startRemote()
 	if g.token != "" {
 		g.checkAccount(g.token, false)
 		go g.refreshGrant()

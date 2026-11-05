@@ -1067,6 +1067,7 @@ func (g *App) setVolume(v float64) {
 	if err != nil {
 		g.notice("Не удалось сохранить настройки: "+err.Error(), "error")
 	}
+	g.remoteVolumeChanged()
 }
 
 func (g *App) setRepeat(r string) {
@@ -1266,13 +1267,17 @@ func (g *App) prepare(trackID string, q yam.Quality, announce bool) {
 }
 
 func (g *App) emitQueue() {
+	g.emit(g.queueSnapshot())
+}
+
+func (g *App) queueSnapshot() queueEvent {
 	p := g.player
 	p.mu.Lock()
+	defer p.mu.Unlock()
 	ev := queueEvent{Type: "queue", Pos: p.queue.Pos(), Tracks: p.shapeAll(p.queue.Tracks())}
 	if p.source != nil {
 		src := *p.source
 		ev.Source = &src
 	}
-	p.mu.Unlock()
-	g.emit(ev)
+	return ev
 }

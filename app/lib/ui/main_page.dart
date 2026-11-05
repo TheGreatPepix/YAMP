@@ -9,6 +9,7 @@ import 'player/compact_player.dart';
 import 'player/library_view.dart';
 import 'player/mini_player.dart';
 import 'player/now_playing.dart';
+import 'remote_page.dart';
 import 'search_view.dart';
 import 'settings_dialog.dart';
 import 'update_dialog.dart';
@@ -298,6 +299,12 @@ class _PhoneMenu extends StatelessWidget {
           ),
         ),
         const Divider(),
+        if (c.desktop.controlsRemote)
+          MenuItemButton(
+            leadingIcon: const Icon(Icons.settings_remote_rounded),
+            onPressed: () => openRemote(context, c),
+            child: const Text('Пульт для компьютера'),
+          ),
         MenuItemButton(
           leadingIcon: const Icon(Icons.settings_rounded),
           onPressed: () => showSettingsDialog(context, c),

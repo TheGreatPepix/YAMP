@@ -63,6 +63,8 @@ class MainActivity : FlutterActivity() {
                 "share" -> result.success(share(call.arguments as String))
                 "pickFolder" -> pickFolder(call.arguments as String?, result)
                 "storageGranted" -> result.success(storageGranted())
+                "deviceName" -> result.success(RemoteNet.deviceName())
+                "multicast" -> result.success(RemoteNet.multicast(this, call.arguments as Boolean))
                 "requestStorage" -> {
                     requestStorage()
                     result.success(null)

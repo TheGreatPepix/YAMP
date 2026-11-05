@@ -35,6 +35,7 @@ func (l *logBuffer) String() string {
 
 func (g *App) emit(event any) {
 	g.host.sendEvent(event)
+	g.forwardRemote(event)
 }
 
 func (g *App) logf(format string, args ...any) {

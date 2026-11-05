@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'core.dart';
 import 'fake_player.dart';
+import 'fake_remote.dart';
 
 class FakeCore implements Core {
   FakeCore({this.tick = const Duration(milliseconds: 120), this.latest = '0.1.8'});
@@ -22,6 +23,7 @@ class FakeCore implements Core {
   var _deviceSeq = 0;
   Map<String, Object?>? lastDownload;
   late final player = FakePlayer(_emit, _later);
+  late final remote = FakeRemote(_emit, _later);
 
   static const _albums = [
     {'id': '10', 'title': 'Группа крови', 'year': 1988, 'count': 11, 'type': 'album'},
@@ -68,7 +70,7 @@ class FakeCore implements Core {
 
   @override
   void send(Map<String, Object?> c) {
-    if (player.handle(c)) return;
+    if (player.handle(c) || remote.handle(c)) return;
     switch (c['cmd']) {
       case 'ready':
         _emit(_state());

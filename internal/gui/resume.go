@@ -104,7 +104,7 @@ func (g *App) forgetResume() {
 	g.player.saves.run(func() { _ = os.Remove(resumePath()) })
 }
 
-func (g *App) playerPosition(trackID string, position float64, force bool) {
+func (g *App) playerPosition(trackID string, position float64, force, playing bool) {
 	p := g.player
 	p.mu.Lock()
 	cur, ok := p.queue.Current()
@@ -115,6 +115,7 @@ func (g *App) playerPosition(trackID string, position float64, force bool) {
 	p.position = max(position, 0)
 	due := force || time.Since(p.savedAt) >= resumeEvery
 	p.mu.Unlock()
+	g.reportPlayback(trackID, max(position, 0), playing)
 	if due {
 		g.persist()
 	}

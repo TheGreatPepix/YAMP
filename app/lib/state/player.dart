@@ -537,7 +537,9 @@ class PlayerState extends ChangeNotifier {
       _advancing = true;
     }
     if (!v && !_advancing) savePosition();
-    if (playing != was) notifyListeners();
+    if (playing == was) return;
+    if (playing) _reportPlayback();
+    notifyListeners();
   }
 
   bool get _nearEnd {
@@ -574,7 +576,14 @@ class PlayerState extends ChangeNotifier {
     final id = track?.id;
     if (id == null || _pending != null) return;
     _reported = position.value;
-    _send({'cmd': 'playerPosition', 'track': id, 'position': _seconds, 'on': true});
+    _send({'cmd': 'playerPosition', 'track': id, 'position': _seconds, 'playing': playing, 'on': true});
+  }
+
+  void _reportPlayback() {
+    final id = track?.id;
+    if (id == null || _pending != null) return;
+    _reported = position.value;
+    _send({'cmd': 'playerPosition', 'track': id, 'position': _seconds, 'playing': playing});
   }
 
   void _onPosition(Duration p) {
@@ -582,7 +591,7 @@ class PlayerState extends ChangeNotifier {
     final id = track?.id;
     if (id != null && playing && (p - _reported).abs() >= _reportEvery) {
       _reported = p;
-      _send({'cmd': 'playerPosition', 'track': id, 'position': _seconds});
+      _send({'cmd': 'playerPosition', 'track': id, 'position': _seconds, 'playing': playing});
     }
     if (id == null || _startedFor == id) return;
     if (p > _openedAt && p < _openedAt + const Duration(seconds: 3)) {
@@ -701,6 +710,7 @@ class PlayerState extends ChangeNotifier {
       return;
     }
     engine.seek(to);
+    _reportPlayback();
   }
 
   void seekBy(Duration delta) {

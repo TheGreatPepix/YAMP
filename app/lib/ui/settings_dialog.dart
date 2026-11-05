@@ -4,6 +4,7 @@ import '../state/controller.dart';
 import '../state/models.dart';
 import '../state/player.dart';
 import '../theme.dart';
+import 'remote_host.dart';
 import 'widgets.dart';
 import 'update_dialog.dart';
 
@@ -18,6 +19,7 @@ enum _Section {
   listening('Прослушивание', Icons.headphones_rounded),
   downloads('Загрузки', Icons.download_rounded),
   look('Оформление', Icons.palette_outlined),
+  remote('Пульт с телефона', Icons.phonelink_ring_rounded),
   about('О программе', Icons.info_outline_rounded);
 
   const _Section(this.title, this.icon);
@@ -41,6 +43,11 @@ String _summary(Controller c, _Section s) => switch (s) {
     ThemeChoice.light => 'Светлая тема',
     ThemeChoice.dark => 'Тёмная тема',
   },
+  _Section.remote => switch (c.remote.phones.length) {
+    0 => 'Телефон не связан',
+    1 => 'Связан телефон «${c.remote.phones.first.name}»',
+    final n => 'Связано телефонов: $n',
+  },
   _Section.about => c.version.isEmpty ? 'YAMP' : 'Версия ${c.version}',
 };
 
@@ -59,17 +66,29 @@ class _SettingsDialogState extends State<_SettingsDialog> {
 
   Controller get c => widget.c;
 
+  List<_Section> get _sections => [
+    for (final s in _Section.values)
+      if (s != _Section.remote || c.desktop.hostsRemote) s,
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    if (c.desktop.hostsRemote) c.remote.openHost();
+  }
+
   Widget _content(_Section s) => switch (s) {
     _Section.listening => _Listening(c: c),
     _Section.downloads => _Downloads(c: c),
     _Section.look => _Look(c: c),
+    _Section.remote => RemoteHostSection(r: c.remote),
     _Section.about => _About(c: c),
   };
 
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: c,
+      listenable: Listenable.merge([c, c.remote]),
       builder: (context, _) => isPhone(context) ? _phone(context) : _desktop(context),
     );
   }
@@ -97,7 +116,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                     padding: const EdgeInsets.fromLTRB(12, 0, 12, 14),
                     child: Text('Настройки', style: text.titleLarge),
                   ),
-                  for (final s in _Section.values)
+                  for (final s in _sections)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 2),
                       child: _NavItem(section: s, selected: s == _selected, onTap: () => setState(() => _selected = s)),
@@ -168,7 +187,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
               ? ListView(
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   children: [
-                    for (final s in _Section.values)
+                    for (final s in _sections)
                       ListTile(
                         leading: Icon(s.icon),
                         title: Text(s.title),

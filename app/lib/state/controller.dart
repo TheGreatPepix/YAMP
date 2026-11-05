@@ -9,6 +9,7 @@ import '../player/engine.dart';
 import 'models.dart';
 import 'player.dart';
 import 'presence.dart';
+import 'remote.dart';
 import 'search.dart';
 
 enum Section { home, search, collection }
@@ -74,6 +75,7 @@ class Controller extends ChangeNotifier {
   final section = ValueNotifier(Section.home);
   final PlayerState player;
   late final search = SearchState(send);
+  late final remote = RemoteState(send);
 
   final _jobs = <int, Job>{};
   List<Job> get jobs => _jobs.values.toList().reversed.toList();
@@ -372,6 +374,12 @@ class Controller extends ChangeNotifier {
       case 'player' || 'queue' || 'playerFormat' || 'mark' || 'library' || 'home' || 'tracks' || 'lyrics':
         player.receive(ev);
         return;
+      case 'remoteHost' || 'remoteDevices' || 'remoteLink' || 'remoteEvent':
+        remote.receive(ev);
+        return;
+      case 'remote':
+        _remoteAction(ev);
+        return;
       case 'state':
         dir = '${ev['dir'] ?? ''}';
         theme = switch ('${ev['theme']}') {
@@ -451,6 +459,22 @@ class Controller extends ChangeNotifier {
     notifyListeners();
   }
 
+  void _remoteAction(Event ev) {
+    switch (ev['action']) {
+      case 'pause':
+        player.pause();
+      case 'resume':
+        player.resume();
+      case 'seek':
+        if (ev['position'] case final num s) player.seek(Duration(milliseconds: (s * 1000).round()));
+      case 'volume':
+        if (ev['volume'] case final num v) {
+          player.previewVolume(v.toDouble());
+          player.commitVolume();
+        }
+    }
+  }
+
   @override
   void dispose() {
     _sub.cancel();
@@ -462,6 +486,7 @@ class Controller extends ChangeNotifier {
       j.dispose();
     }
     search.dispose();
+    remote.dispose();
     downloadsOpen.dispose();
     compact.dispose();
     pinned.dispose();

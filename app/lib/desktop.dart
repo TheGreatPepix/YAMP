@@ -50,6 +50,28 @@ class Desktop {
 
   bool get detectsNetwork => Platform.isAndroid;
 
+  bool get hostsRemote => _desktop;
+
+  bool get controlsRemote => Platform.isAndroid;
+
+  Future<String> deviceName() async {
+    if (!Platform.isAndroid) return Platform.localHostname;
+    try {
+      return await _android.invokeMethod<String>('deviceName') ?? '';
+    } on MissingPluginException {
+      return '';
+    }
+  }
+
+  Future<void> listenLan(bool on) async {
+    if (!Platform.isAndroid) return;
+    try {
+      await _android.invokeMethod<bool>('multicast', on);
+    } on MissingPluginException {
+      return;
+    }
+  }
+
   Future<void> watchNetwork(void Function(bool metered) changed) async {
     if (!Platform.isAndroid) return;
     _android.setMethodCallHandler((call) async {

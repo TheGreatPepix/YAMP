@@ -136,7 +136,7 @@ func (g *App) onMessage(message string) {
 	case "playerShuffle":
 		g.setShuffle(c.On)
 	case "playerPosition":
-		g.playerPosition(c.Track, c.Position, c.On)
+		g.playerPosition(c.Track, c.Position, c.On, c.Playing)
 	case "playerState":
 		g.emitPlayer("")
 	case "queue":
@@ -156,9 +156,14 @@ func (g *App) onMessage(message string) {
 	case "remove":
 		g.jobs.remove(c.ID)
 	case "exit":
+		g.closeRemote()
 		g.flushResume()
 		g.jobs.cancel(0)
 		g.host.post(g.host.exit)
+	default:
+		if strings.HasPrefix(c.Cmd, "remote") {
+			g.remoteUI(message)
+		}
 	}
 }
 
