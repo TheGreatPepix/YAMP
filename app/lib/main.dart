@@ -26,7 +26,7 @@ Future<void> main(List<String> args) async {
     core = path == null ? _MissingCore() : await ProcessCore.start(path);
   }
   final controller = Controller(core, desktop: Desktop(args: args), engine: engine);
-  if (Platform.isAndroid && !demo) SystemMedia(controller.player);
+  if (!demo) SystemMedia(controller.player);
   runApp(YmdApp(controller: controller));
 }
 

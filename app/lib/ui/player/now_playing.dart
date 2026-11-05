@@ -141,6 +141,7 @@ class NowPlaying extends StatelessWidget {
                       menu: menu,
                       onQueue: () => _openQueue(context),
                       compact: compact,
+                      minHeight: phone ? box.maxHeight : 0,
                     ),
                   );
                 },
@@ -440,7 +441,7 @@ class _WideCover extends StatelessWidget {
                                         children: [QualityMenu(p: p), _AlbumChip(track: track, onOpen: onOpen)],
                                       ),
                                     ),
-                                    VolumeControl(p: p, width: 110),
+                                    VolumeControl(p: p),
                                   ],
                                 ),
                                 const SizedBox(height: 12),
@@ -566,7 +567,7 @@ class _WideLyrics extends StatelessWidget {
                               style: TextStyle(fontSize: 13, color: muted),
                             ),
                           ),
-                        VolumeControl(p: p, width: 96),
+                        VolumeControl(p: p),
                       ],
                     ),
                   ),
@@ -590,6 +591,7 @@ class _NarrowCover extends StatelessWidget {
     required this.menu,
     required this.onQueue,
     this.compact,
+    this.minHeight = 0,
   });
 
   final PlayerState p;
@@ -600,6 +602,7 @@ class _NarrowCover extends StatelessWidget {
   final Widget menu;
   final VoidCallback onQueue;
   final Widget? compact;
+  final double minHeight;
 
   @override
   Widget build(BuildContext context) {
@@ -652,42 +655,51 @@ class _NarrowCover extends StatelessWidget {
                   const SizedBox(height: 24),
                 ],
               );
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            top,
-            Padding(
-              padding: pad,
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 560),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _Info(p: p, track: track, onOpen: onOpen, menu: menu),
-                      const SizedBox(height: 8),
-                      SeekBar(p: p),
-                      const SizedBox(height: 4),
-                      _Transport(p: p, skip: 52, play: w < 360 ? 64 : 72),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          QualityMenu(p: p),
-                          const Spacer(),
-                          if (!phone) VolumeControl(p: p, width: 110),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      if (p.next != null) _NextCard(track: p.next!, onTap: onQueue),
-                      const SizedBox(height: 8),
-                      _Actions(p: p, track: track, onOpen: onOpen),
-                      const SizedBox(height: 24),
-                    ],
-                  ),
-                ),
-              ),
+        Widget column(List<Widget> children) => Padding(
+          padding: pad,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
             ),
-          ],
+          ),
+        );
+        return ConstrainedBox(
+          constraints: BoxConstraints(minHeight: minHeight),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  top,
+                  column([
+                    _Info(p: p, track: track, onOpen: onOpen, menu: menu),
+                    const SizedBox(height: 8),
+                    SeekBar(p: p),
+                    const SizedBox(height: 4),
+                    _Transport(p: p, skip: 52, play: w < 360 ? 64 : 72),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        QualityMenu(p: p),
+                        const Spacer(),
+                        if (!phone) VolumeControl(p: p),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    if (p.next != null) _NextCard(track: p.next!, onTap: onQueue),
+                  ]),
+                ],
+              ),
+              column([
+                SizedBox(height: phone ? 16 : 8),
+                _Actions(p: p, track: track),
+                SizedBox(height: phone ? 12 : 24),
+              ]),
+            ],
+          ),
         );
       },
     );
@@ -761,11 +773,10 @@ class _NextCard extends StatelessWidget {
 }
 
 class _Actions extends StatelessWidget {
-  const _Actions({required this.p, required this.track, required this.onOpen});
+  const _Actions({required this.p, required this.track});
 
   final PlayerState p;
   final PlayTrack track;
-  final OpenPage onOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -776,11 +787,6 @@ class _Actions extends StatelessWidget {
           tooltip: track.hasLyrics ? 'Текст песни' : 'У трека нет текста',
           onPressed: track.hasLyrics ? () => p.lyricsOpen.value = true : null,
           icon: const Icon(Icons.lyrics_outlined),
-        ),
-        IconButton(
-          tooltip: 'Перейти к альбому',
-          onPressed: track.albumSource.isEmpty ? null : () => onOpen(track.albumSource),
-          icon: const Icon(Icons.album_outlined),
         ),
         IconButton(
           tooltip: 'Поделиться',

@@ -118,7 +118,6 @@ class _Desktop extends StatelessWidget {
       builder: (context, box) {
         final wide = box.maxWidth >= 1100;
         final roomy = box.maxWidth >= 820;
-        final slider = box.maxWidth >= (onCompact != null ? 1180 : 1100);
         final quality = box.maxWidth >= (onCompact != null ? 900 : 820);
         return Container(
           constraints: const BoxConstraints(minHeight: 80),
@@ -178,7 +177,7 @@ class _Desktop extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     if (quality) Flexible(child: QualityMenu(p: p)),
-                    if (slider) VolumeControl(p: p) else _MuteOnly(p: p),
+                    VolumeControl(p: p),
                     if (onCompact != null)
                       IconButton(
                         tooltip: 'Мини-плеер',
@@ -197,21 +196,6 @@ class _Desktop extends StatelessWidget {
           ),
         );
       },
-    );
-  }
-}
-
-class _MuteOnly extends StatelessWidget {
-  const _MuteOnly({required this.p});
-
-  final PlayerState p;
-
-  @override
-  Widget build(BuildContext context) {
-    return IconButton(
-      tooltip: p.volume == 0 ? 'Включить звук' : 'Выключить звук',
-      onPressed: p.toggleMute,
-      icon: Icon(p.volume == 0 ? Icons.volume_off_rounded : Icons.volume_up_rounded),
     );
   }
 }

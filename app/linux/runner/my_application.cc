@@ -5,7 +5,9 @@
 #include <gdk/gdkx.h>
 #endif
 
+#include "desktop.h"
 #include "flutter/generated_plugin_registrant.h"
+#include "mpris.h"
 
 struct _MyApplication {
   GtkApplication parent_instance;
@@ -88,6 +90,10 @@ static void my_application_activate(GApplication* application) {
   gtk_widget_realize(GTK_WIDGET(view));
 
   fl_register_plugins(FL_PLUGIN_REGISTRY(view));
+  FlBinaryMessenger* messenger =
+      fl_engine_get_binary_messenger(fl_view_get_engine(view));
+  desktop_start(messenger, window);
+  mpris_start(messenger, window);
 
   gtk_widget_grab_focus(GTK_WIDGET(view));
 }

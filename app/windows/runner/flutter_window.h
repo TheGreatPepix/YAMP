@@ -11,6 +11,7 @@
 #include <memory>
 #include <string>
 
+#include "media_controls.h"
 #include "win32_window.h"
 
 class FlutterWindow : public Win32Window {
@@ -47,6 +48,7 @@ class FlutterWindow : public Win32Window {
   flutter::DartProject project_;
   std::unique_ptr<flutter::FlutterViewController> flutter_controller_;
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> channel_;
+  std::unique_ptr<MediaControls> media_;
 
   bool quitting_ = false;
   bool compact_ = false;

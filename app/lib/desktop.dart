@@ -9,6 +9,7 @@ class Desktop {
   static const restartFlag = '--restart';
   static const _channel = MethodChannel('yamp/desktop');
   static const _android = MethodChannel('yamp/android');
+  static final _desktop = Platform.isWindows || Platform.isMacOS || Platform.isLinux;
 
   Future<bool> storageGranted() async {
     if (!Platform.isAndroid) return true;
@@ -31,7 +32,7 @@ class Desktop {
   final List<String> args;
 
   Future<void> _call(String method, [Object? args]) async {
-    if (!Platform.isWindows) return;
+    if (!_desktop) return;
     try {
       await _channel.invokeMethod<void>(method, args);
     } on MissingPluginException {
@@ -63,7 +64,7 @@ class Desktop {
 
   void showWindow() => _call('show');
 
-  bool get canCompact => Platform.isWindows;
+  bool get canCompact => _desktop;
 
   Future<void> compact(bool on, {int width = 0, int height = 0}) =>
       _call('compact', {'on': on, 'width': width, 'height': height});

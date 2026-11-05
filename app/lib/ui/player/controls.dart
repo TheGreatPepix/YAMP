@@ -1,5 +1,9 @@
+import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../state/player.dart';
 import '../../theme.dart';
@@ -293,47 +297,274 @@ class _SeekBarState extends State<SeekBar> {
   }
 }
 
-class VolumeControl extends StatelessWidget {
-  const VolumeControl({super.key, required this.p, this.width = 96});
+class VolumeControl extends StatefulWidget {
+  const VolumeControl({super.key, required this.p, this.width});
 
   final PlayerState p;
-  final double width;
+  final double? width;
+
+  @override
+  State<VolumeControl> createState() => _VolumeControlState();
+}
+
+class _VolumeControlState extends State<VolumeControl> {
+  final _portal = OverlayPortalController();
+  final _anchor = GlobalKey();
+  Timer? _hide;
+  Timer? _commit;
+  var _overButton = false;
+  var _overPopup = false;
+  var _focused = false;
+  var _dragging = false;
+  var _touch = false;
+
+  PlayerState get p => widget.p;
+
+  static const _step = 0.05;
+
+  void _show() {
+    _hide?.cancel();
+    if (!_portal.isShowing) _portal.show();
+  }
+
+  void _leave() {
+    _hide?.cancel();
+    _hide = Timer(const Duration(milliseconds: 240), () {
+      if (!mounted || _dragging || _focused || _overButton || _overPopup || !_portal.isShowing) return;
+      _portal.hide();
+    });
+  }
+
+  void _close() {
+    _hide?.cancel();
+    if (_portal.isShowing) _portal.hide();
+  }
+
+  void _nudge(int steps) {
+    p.previewVolume(((p.volume + steps * _step) / _step).round() * _step);
+    _commit?.cancel();
+    _commit = Timer(const Duration(milliseconds: 400), p.commitVolume);
+  }
+
+  void _scroll(PointerSignalEvent e) {
+    if (e is! PointerScrollEvent) return;
+    GestureBinding.instance.pointerSignalResolver.register(e, (e) {
+      final dy = (e as PointerScrollEvent).scrollDelta.dy;
+      if (dy == 0) return;
+      _nudge(dy < 0 ? 1 : -1);
+      if (widget.width == null) _show();
+    });
+  }
+
+  void _pressed() {
+    if (!_touch) {
+      p.toggleMute();
+    } else if (_portal.isShowing) {
+      _close();
+    } else {
+      _show();
+    }
+  }
+
+  @override
+  void dispose() {
+    _hide?.cancel();
+    if (_commit?.isActive ?? false) {
+      _commit!.cancel();
+      p.commitVolume();
+    }
+    super.dispose();
+  }
+
+  Widget _slider(BuildContext context) {
+    return SliderTheme(
+      data: SliderTheme.of(context).copyWith(
+        trackHeight: 4,
+        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+        overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
+        tickMarkShape: SliderTickMarkShape.noTickMark,
+        showValueIndicator: ShowValueIndicator.never,
+      ),
+      child: Slider(
+        value: p.volume,
+        divisions: 20,
+        semanticFormatterCallback: (x) => 'Громкость ${(x * 100).round()}%',
+        onChangeStart: (_) => _dragging = true,
+        onChanged: p.previewVolume,
+        onChangeEnd: (_) {
+          _dragging = false;
+          p.commitVolume();
+          _leave();
+        },
+      ),
+    );
+  }
+
+  Widget _inline(BuildContext context, double width) {
+    final v = p.volume;
+    return Listener(
+      onPointerSignal: _scroll,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            tooltip: v == 0 ? 'Включить звук' : 'Выключить звук',
+            onPressed: p.toggleMute,
+            icon: Icon(
+              v == 0 ? Icons.volume_off_rounded : (v < 0.5 ? Icons.volume_down_rounded : Icons.volume_up_rounded),
+            ),
+          ),
+          SizedBox(width: width, child: _slider(context)),
+        ],
+      ),
+    );
+  }
+
+  Widget _popup(BuildContext context) {
+    final anchor = _anchor.currentContext?.findRenderObject();
+    final overlay = Overlay.of(context).context.findRenderObject();
+    if (anchor is! RenderBox || overlay is! RenderBox || !anchor.attached || !anchor.hasSize) {
+      return const SizedBox.shrink();
+    }
+    final rect = MatrixUtils.transformRect(anchor.getTransformTo(overlay), Offset.zero & anchor.size);
+    final theme = Theme.of(context);
+    final muted = theme.colorScheme.onSurfaceVariant;
+    return CustomSingleChildLayout(
+      delegate: _PopupLayout(rect),
+      child: TapRegion(
+        groupId: this,
+        onTapOutside: (_) => _close(),
+        child: MouseRegion(
+          onEnter: (_) {
+            _overPopup = true;
+            _show();
+          },
+          onExit: (_) {
+            _overPopup = false;
+            _leave();
+          },
+          child: Listener(
+            onPointerSignal: _scroll,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Material(
+                color: theme.popupMenuTheme.color ?? theme.colorScheme.surfaceContainerHigh,
+                elevation: 6,
+                borderRadius: BorderRadius.circular(14),
+                child: SizedBox(
+                  width: 44,
+                  child: ListenableBuilder(
+                    listenable: p,
+                    builder: (context, _) => Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(height: 10),
+                        Text(
+                          '${(p.volume * 100).round()}',
+                          style: TextStyle(fontSize: 12, color: muted, fontFeatures: tabular),
+                        ),
+                        Flexible(
+                          child: SizedBox(
+                            height: 124,
+                            child: RotatedBox(quarterTurns: 3, child: _slider(context)),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final width = widget.width;
+    if (width != null) return _inline(context, width);
     final v = p.volume;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        IconButton(
-          tooltip: v == 0 ? 'Включить звук' : 'Выключить звук',
-          onPressed: p.toggleMute,
-          icon: Icon(
-            v == 0 ? Icons.volume_off_rounded : (v < 0.5 ? Icons.volume_down_rounded : Icons.volume_up_rounded),
+    return OverlayPortal(
+      controller: _portal,
+      overlayChildBuilder: _popup,
+      child: TapRegion(
+        groupId: this,
+        child: Semantics(
+          container: true,
+          label: 'Громкость',
+          value: '${(v * 100).round()}%',
+          increasedValue: '${((v + _step).clamp(0.0, 1.0) * 100).round()}%',
+          decreasedValue: '${((v - _step).clamp(0.0, 1.0) * 100).round()}%',
+          onIncrease: () => _nudge(1),
+          onDecrease: () => _nudge(-1),
+          child: CallbackShortcuts(
+            bindings: {
+              const SingleActivator(LogicalKeyboardKey.arrowUp): () => _nudge(1),
+              const SingleActivator(LogicalKeyboardKey.arrowDown): () => _nudge(-1),
+            },
+            child: Focus(
+              canRequestFocus: false,
+              skipTraversal: true,
+              onFocusChange: (focused) {
+                _focused = focused;
+                focused ? _show() : _leave();
+              },
+              child: MouseRegion(
+                onEnter: (_) {
+                  _overButton = true;
+                  _show();
+                },
+                onExit: (_) {
+                  _overButton = false;
+                  _leave();
+                },
+                child: Listener(
+                  onPointerDown: (e) => _touch = e.kind == PointerDeviceKind.touch,
+                  onPointerSignal: _scroll,
+                  child: IconButton(
+                    key: _anchor,
+                    onPressed: _pressed,
+                    icon: Icon(
+                      v == 0 ? Icons.volume_off_rounded : (v < 0.5 ? Icons.volume_down_rounded : Icons.volume_up_rounded),
+                      semanticLabel: v == 0 ? 'Включить звук' : 'Выключить звук',
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
-        SizedBox(
-          width: width,
-          child: SliderTheme(
-            data: SliderTheme.of(context).copyWith(
-              trackHeight: 4,
-              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-              overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
-              tickMarkShape: SliderTickMarkShape.noTickMark,
-              showValueIndicator: ShowValueIndicator.never,
-            ),
-            child: Slider(
-              value: v,
-              divisions: 20,
-              semanticFormatterCallback: (x) => 'Громкость ${(x * 100).round()}%',
-              onChanged: p.previewVolume,
-              onChangeEnd: (_) => p.commitVolume(),
-            ),
-          ),
-        ),
-      ],
+      ),
     );
   }
+}
+
+class _PopupLayout extends SingleChildLayoutDelegate {
+  _PopupLayout(this.anchor);
+
+  final Rect anchor;
+
+  static const _margin = 8.0;
+
+  @override
+  BoxConstraints getConstraintsForChild(BoxConstraints constraints) {
+    final room = math.max(anchor.top, constraints.maxHeight - anchor.bottom) - _margin;
+    return BoxConstraints(maxWidth: constraints.maxWidth, maxHeight: math.max(room, 0));
+  }
+
+  @override
+  Offset getPositionForChild(Size size, Size childSize) {
+    final below = size.height - anchor.bottom;
+    final above = anchor.top - _margin >= childSize.height || anchor.top >= below;
+    final x = (anchor.center.dx - childSize.width / 2).clamp(_margin, math.max(_margin, size.width - childSize.width - _margin)).toDouble();
+    return Offset(x, above ? anchor.top - childSize.height : anchor.bottom);
+  }
+
+  @override
+  bool shouldRelayout(_PopupLayout oldDelegate) => oldDelegate.anchor != anchor;
 }
 
 String qualityLabel(PlayQuality q) => switch (q) {

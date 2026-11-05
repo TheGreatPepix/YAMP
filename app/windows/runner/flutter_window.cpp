@@ -15,6 +15,7 @@ namespace {
 constexpr UINT kTrayMessage = WM_APP + 1;
 constexpr UINT kTrayId = 1;
 constexpr UINT kMenuOpen = 1, kMenuExit = 2;
+constexpr UINT kDrawCaption = 0xAE, kDrawFrame = 0xAF;
 
 std::wstring Wide(const std::string& utf8) {
   if (utf8.empty()) {
@@ -111,6 +112,8 @@ bool FlutterWindow::OnCreate() {
   channel_->SetMethodCallHandler([this](const auto& call, auto result) {
     HandleCall(call, std::move(result));
   });
+  media_ = std::make_unique<MediaControls>(
+      flutter_controller_->engine()->messenger(), GetHandle());
 
   taskbar_created_ = RegisterWindowMessageW(L"TaskbarCreated");
   AddTrayIcon();
@@ -129,6 +132,7 @@ bool FlutterWindow::OnCreate() {
 
 void FlutterWindow::OnDestroy() {
   RemoveTrayIcon();
+  media_ = nullptr;
   channel_ = nullptr;
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
@@ -394,6 +398,11 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
     return 0;
   }
   switch (message) {
+    case MediaControls::kMessage:
+      if (media_) {
+        media_->Dispatch(wparam, lparam);
+      }
+      return 0;
     case kTrayMessage:
       if (LOWORD(lparam) == WM_LBUTTONUP) {
         ToggleWindow();
@@ -415,6 +424,18 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
     case WM_NCCALCSIZE:
       if (compact_ && wparam == TRUE) {
         return 0;
+      }
+      break;
+    case WM_NCPAINT:
+    case kDrawCaption:
+    case kDrawFrame:
+      if (compact_) {
+        return 0;
+      }
+      break;
+    case WM_NCACTIVATE:
+      if (compact_) {
+        return DefWindowProcW(hwnd, message, wparam, -1);
       }
       break;
     case WM_SIZE:
