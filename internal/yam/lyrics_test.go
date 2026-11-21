@@ -14,19 +14,34 @@ import (
 func TestParseLRC(t *testing.T) {
 	body := "[ar:Маяк]\r\n[00:12.34] Город в огнях\n[00:05.5]Первая\n\n[01:02.003][00:20.00] Припев\n[00:30.00]\n[00:40.00] Конец\n[00:45.00]\n"
 	want := []LyricLine{
-		{5500, "Первая"},
-		{12340, "Город в огнях"},
-		{20000, "Припев"},
-		{30000, ""},
-		{40000, "Конец"},
-		{45000, ""},
-		{62003, "Припев"},
+		{Ms: 5500, Text: "Первая"},
+		{Ms: 12340, Text: "Город в огнях"},
+		{Ms: 20000, Text: "Припев"},
+		{Ms: 30000, Text: ""},
+		{Ms: 40000, Text: "Конец"},
+		{Ms: 45000, Text: ""},
+		{Ms: 62003, Text: "Припев"},
 	}
 	if got := ParseLRC(body); !reflect.DeepEqual(got, want) {
 		t.Errorf("ParseLRC = %v, want %v", got, want)
 	}
 	if got := ParseLRC("просто текст\nбез меток"); len(got) != 0 {
 		t.Errorf("текст без меток = %v", got)
+	}
+
+	karaoke := "[00:10.00] <00:10.00>Го-<00:10.20>род <00:10.50>в ог-<00:11.00>нях\n"
+	want = []LyricLine{{
+		Ms:   10000,
+		Text: "Го-род в ог-нях",
+		Words: []LyricWord{
+			{Ms: 10000, Text: "Го-"},
+			{Ms: 10200, Text: "род "},
+			{Ms: 10500, Text: "в ог-"},
+			{Ms: 11000, Text: "нях"},
+		},
+	}}
+	if got := ParseLRC(karaoke); !reflect.DeepEqual(got, want) {
+		t.Errorf("ParseLRC karaoke = %v, want %v", got, want)
 	}
 }
 
@@ -85,11 +100,11 @@ func TestLyrics(t *testing.T) {
 	ctx := context.Background()
 
 	l, err := c.Lyrics(ctx, "1", LyricsSync)
-	if err != nil || !l.Synced || !reflect.DeepEqual(l.Lines, []LyricLine{{1000, "Раз"}, {2500, "Два"}}) || !reflect.DeepEqual(l.Writers, []string{"Автор"}) {
+	if err != nil || !l.Synced || !reflect.DeepEqual(l.Lines, []LyricLine{{Ms: 1000, Text: "Раз"}, {Ms: 2500, Text: "Два"}}) || !reflect.DeepEqual(l.Writers, []string{"Автор"}) {
 		t.Errorf("синхронный = %+v, %v", l, err)
 	}
 	l, err = c.Lyrics(ctx, "2", LyricsUnknown)
-	if err != nil || l.Synced || !reflect.DeepEqual(l.Lines, []LyricLine{{-1, "Строка один"}, {-1, ""}, {-1, "Строка два"}}) {
+	if err != nil || l.Synced || !reflect.DeepEqual(l.Lines, []LyricLine{{Ms: -1, Text: "Строка один"}, {Ms: -1, Text: ""}, {Ms: -1, Text: "Строка два"}}) {
 		t.Errorf("обычный = %+v, %v", l, err)
 	}
 	l, err = c.Lyrics(ctx, "3", LyricsUnknown)

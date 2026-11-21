@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../state/player.dart';
@@ -131,6 +132,12 @@ class _LyricsViewState extends State<LyricsView> {
                       key: _keys[i],
                       line: l.lines[i],
                       size: size,
+                      active: l.synced && i == _line,
+                      words: l.synced && i == _line ? l.wordsOf(i) : const [],
+                      position: p.position,
+                      end: i + 1 < l.lines.length && l.lines[i + 1].at != null
+                          ? l.lines[i + 1].at!
+                          : (l.lines[i].at ?? Duration.zero) + const Duration(seconds: 4),
                       color: !l.synced
                           ? white.withValues(alpha: 0.86)
                           : i == _line
@@ -157,12 +164,57 @@ class _LyricsViewState extends State<LyricsView> {
 }
 
 class _Line extends StatelessWidget {
-  const _Line({super.key, required this.line, required this.size, required this.color, this.onTap});
+  const _Line({
+    super.key,
+    required this.line,
+    required this.size,
+    required this.color,
+    this.active = false,
+    this.words = const [],
+    this.position,
+    this.end = Duration.zero,
+    this.onTap,
+  });
 
   final LyricLine line;
   final double size;
   final Color color;
+  final bool active;
+  final List<LyricWord> words;
+  final ValueListenable<Duration>? position;
+  final Duration end;
   final VoidCallback? onTap;
+
+  Widget _text() {
+    final empty = line.text.isEmpty;
+    if (!active || words.isEmpty) {
+      return Text(empty ? '· · ·' : line.text);
+    }
+    final listenable = position!;
+    final dim = Colors.white.withValues(alpha: 0.42);
+    Color at(int i, Duration pos) {
+      final start = words[i].at;
+      final stop = i + 1 < words.length ? words[i + 1].at : end;
+      var frac = (pos - start).inMilliseconds / (stop - start).inMilliseconds;
+      if (frac < 0) frac = 0;
+      if (frac > 1) frac = 1;
+      return Color.lerp(dim, Colors.white, frac)!;
+    }
+
+    return ValueListenableBuilder<Duration>(
+      valueListenable: listenable,
+      builder: (context, pos, _) {
+        return Text.rich(
+          TextSpan(
+            children: [
+              for (var i = 0; i < words.length; i++)
+                TextSpan(text: words[i].text, style: TextStyle(color: at(i, pos))),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -176,7 +228,7 @@ class _Line extends StatelessWidget {
         letterSpacing: -0.01 * size,
         color: color,
       ),
-      child: Text(empty ? '· · ·' : line.text),
+      child: _text(),
     );
     final pad = EdgeInsets.symmetric(vertical: size * 0.22, horizontal: 8);
     if (onTap == null) return Padding(padding: pad, child: text);

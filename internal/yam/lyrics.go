@@ -24,9 +24,15 @@ const (
 	LyricsSync    LyricsKind = "sync"
 )
 
-type LyricLine struct {
+type LyricWord struct {
 	Ms   int    `json:"ms"`
 	Text string `json:"text"`
+}
+
+type LyricLine struct {
+	Ms    int         `json:"ms"`
+	Text  string      `json:"text"`
+	Words []LyricWord `json:"words,omitempty"`
 }
 
 type Lyrics struct {
@@ -112,6 +118,44 @@ func (c *Client) Lyrics(ctx context.Context, trackID string, kind LyricsKind) (L
 }
 
 var lrcStampRe = regexp.MustCompile(`^\[(\d{1,3}):(\d{1,2})(?:[.:](\d{1,3}))?\]`)
+var lrcWordRe = regexp.MustCompile(`<(\d{1,3}):(\d{1,2})(?:[.:](\d{1,3}))?>`)
+
+func stampMs(mm, sec, frac string) int {
+	m, _ := strconv.Atoi(mm)
+	s, _ := strconv.Atoi(sec)
+	ms := 0
+	if frac != "" {
+		n, _ := strconv.Atoi(frac)
+		for i := len(frac); i < 3; i++ {
+			n *= 10
+		}
+		ms = n
+	}
+	return (m*60 + s) * 1000 + ms
+}
+
+func parseWords(line string) ([]LyricWord, string) {
+	matches := lrcWordRe.FindAllStringSubmatch(line, -1)
+	if len(matches) == 0 {
+		return nil, line
+	}
+	idx := lrcWordRe.FindAllStringIndex(line, -1)
+	words := make([]LyricWord, 0, len(matches))
+	var text strings.Builder
+	for i, m := range matches {
+		end := len(line)
+		if i+1 < len(idx) {
+			end = idx[i+1][0]
+		}
+		w := line[idx[i][1]:end]
+		if i == 0 {
+			w = strings.TrimLeft(line[:idx[i][0]]+w, " ")
+		}
+		words = append(words, LyricWord{Ms: stampMs(m[1], m[2], m[3]), Text: w})
+		text.WriteString(w)
+	}
+	return words, text.String()
+}
 
 func ParseLRC(body string) []LyricLine {
 	var out []LyricLine
@@ -123,21 +167,12 @@ func ParseLRC(body string) []LyricLine {
 			if m == nil {
 				break
 			}
-			mm, _ := strconv.Atoi(m[1])
-			sec, _ := strconv.Atoi(m[2])
-			ms := 0
-			if frac := m[3]; frac != "" {
-				n, _ := strconv.Atoi(frac)
-				for i := len(frac); i < 3; i++ {
-					n *= 10
-				}
-				ms = n
-			}
-			stamps = append(stamps, (mm*60+sec)*1000+ms)
+			stamps = append(stamps, stampMs(m[1], m[2], m[3]))
 			line = strings.TrimSpace(line[len(m[0]):])
 		}
+		words, text := parseWords(line)
 		for _, at := range stamps {
-			out = append(out, LyricLine{Ms: at, Text: line})
+			out = append(out, LyricLine{Ms: at, Text: text, Words: words})
 		}
 	}
 	slices.SortStableFunc(out, func(a, b LyricLine) int { return a.Ms - b.Ms })

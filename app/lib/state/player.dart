@@ -88,11 +88,19 @@ class PlayTrack {
   bool get hasLyrics => lyrics != 'none';
 }
 
+class LyricWord {
+  const LyricWord(this.at, this.text);
+
+  final Duration at;
+  final String text;
+}
+
 class LyricLine {
-  const LyricLine(this.at, this.text);
+  const LyricLine(this.at, this.text, [this.words = const []]);
 
   final Duration? at;
   final String text;
+  final List<LyricWord> words;
 }
 
 class Lyrics {
@@ -123,6 +131,22 @@ class Lyrics {
       }
     }
     return found;
+  }
+
+  List<LyricWord> wordsOf(int i) {
+    final line = lines[i];
+    if (line.words.isNotEmpty) return line.words;
+    if (!synced || line.at == null) return const [];
+    final start = line.at!;
+    final end = i + 1 < lines.length && lines[i + 1].at != null
+        ? lines[i + 1].at!
+        : start + const Duration(seconds: 4);
+    final span = end - start;
+    final parts = line.text.split(' ');
+    return [
+      for (var k = 0; k < parts.length; k++)
+        LyricWord(start + span * (k / parts.length), parts[k] + (k + 1 < parts.length ? ' ' : '')),
+    ];
   }
 }
 
@@ -430,7 +454,15 @@ class PlayerState extends ChangeNotifier {
                 lines: [
                   for (final l in (ev['lines'] as List? ?? const []))
                     if (l is Map<String, dynamic>)
-                      LyricLine(synced ? Duration(milliseconds: _i(l['ms'])) : null, _s(l['text'])),
+                      LyricLine(
+                        synced ? Duration(milliseconds: _i(l['ms'])) : null,
+                        _s(l['text']),
+                        [
+                          for (final w in (l['words'] as List? ?? const []))
+                            if (w is Map<String, dynamic>)
+                              LyricWord(Duration(milliseconds: _i(w['ms'])), _s(w['text'])),
+                        ],
+                      ),
                 ],
                 writers: [for (final w in (ev['writers'] as List? ?? const [])) _s(w)],
               );

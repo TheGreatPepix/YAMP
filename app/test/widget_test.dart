@@ -13,7 +13,7 @@ import 'package:yamp/ui/search_view.dart';
 
 Future<(FakeCore, Controller)> _open(
   WidgetTester tester, {
-  String latest = '0.2.1',
+  String latest = '0.2.2',
   Duration tick = const Duration(milliseconds: 120),
 }) async {
   tester.view.physicalSize = const Size(1280, 860);
@@ -88,7 +88,7 @@ void main() {
     final (core, c) = await _open(tester);
 
     expect(c.ready, isTrue);
-    expect(c.version, '0.2.1');
+    expect(c.version, '0.2.2');
     expect(find.text('Войти через Яндекс'), findsOneWidget);
     expect(find.text('Моя волна'), findsNothing);
 
@@ -201,7 +201,7 @@ void main() {
     expect(find.text('Качество звука'), findsOneWidget);
     await tester.tap(find.text('О программе'));
     await tester.pumpAndSettle();
-    expect(find.text('Версия 0.2.1'), findsOneWidget);
+    expect(find.text('Версия 0.2.2'), findsOneWidget);
 
     await tester.tap(find.text('Проверить'));
     await tester.pump();
@@ -233,7 +233,7 @@ void main() {
     expect(core.playQuality.last, containsPair('auto', false));
     expect(find.text('Всегда'), findsOneWidget);
     expect(find.text('Wi-Fi и кабель'), findsNothing);
-    await tester.tap(find.text('MP3 320'));
+    await tester.tap(find.text('Хорошее'));
     await tester.pumpAndSettle();
     expect(core.playQuality.last, {'cmd': 'playQuality', 'auto': false, 'quality': 'mp3'});
 
@@ -285,7 +285,7 @@ void main() {
     await tester.tap(find.text('Настройки'));
     await tester.pumpAndSettle();
     expect(find.text('Прослушивание'), findsOneWidget);
-    expect(find.text('Авто: Wi-Fi FLAC, мобильный MP3 320'), findsOneWidget);
+    expect(find.text('Авто: Wi-Fi Лучшее, мобильный Хорошее'), findsOneWidget);
     await tester.tap(find.text('Оформление'));
     await tester.pumpAndSettle();
     expect(find.text('Светлая'), findsOneWidget);

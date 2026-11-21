@@ -29,8 +29,8 @@ enum _Section {
 }
 
 String _short(PlayQuality q) => switch (q) {
-  PlayQuality.lossless => 'FLAC',
-  PlayQuality.mp3 => 'MP3 320',
+  PlayQuality.lossless => 'Лучшее',
+  PlayQuality.mp3 => 'Хорошее',
   PlayQuality.low => 'Эконом',
 };
 
@@ -347,15 +347,16 @@ class _Listening extends StatelessWidget {
 }
 
 String qualityName(PlayQuality q) => switch (q) {
-  PlayQuality.lossless => 'FLAC',
-  PlayQuality.mp3 => 'MP3 320',
-  PlayQuality.low => 'экономном качестве',
+  PlayQuality.lossless => 'в лучшем качестве',
+  PlayQuality.mp3 => 'в хорошем качестве',
+  PlayQuality.low => 'в экономном качестве',
 };
 
 String qualityHint(PlayQuality q) => switch (q) {
-  PlayQuality.lossless => 'FLAC без потерь до 24 бит / 192 кГц. Если у трека нет lossless, играет MP3 320.',
-  PlayQuality.mp3 => 'MP3 320: почти не отличить на слух, а трафика в 3-5 раз меньше.',
-  PlayQuality.low => 'Экономный режим для слабой связи: битрейт ниже, трафика меньше.',
+  PlayQuality.lossless =>
+    'Лучшее: FLAC без потерь до 24 бит / 192 кГц. Если у трека нет lossless, играет MP3 320.',
+  PlayQuality.mp3 => 'Хорошее: MP3 320, почти не отличить на слух, а трафика в 3-5 раз меньше.',
+  PlayQuality.low => 'Экономия трафика для слабой связи: битрейт ниже, трафика меньше.',
 };
 
 class _QualityPick extends StatelessWidget {
@@ -376,7 +377,6 @@ class _QualityPick extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final phone = isPhone(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -394,10 +394,10 @@ class _QualityPick extends StatelessWidget {
         ),
         SegmentedButton<PlayQuality>(
           showSelectedIcon: false,
-          segments: [
-            ButtonSegment(value: PlayQuality.lossless, label: Text(phone ? 'FLAC' : 'FLAC без потерь')),
-            const ButtonSegment(value: PlayQuality.mp3, label: Text('MP3 320')),
-            const ButtonSegment(value: PlayQuality.low, label: Text('Эконом')),
+          segments: const [
+            ButtonSegment(value: PlayQuality.lossless, label: Text('Лучшее')),
+            ButtonSegment(value: PlayQuality.mp3, label: Text('Хорошее')),
+            ButtonSegment(value: PlayQuality.low, label: Text('Эконом')),
           ],
           selected: {value},
           onSelectionChanged: (s) => onChanged(s.first),

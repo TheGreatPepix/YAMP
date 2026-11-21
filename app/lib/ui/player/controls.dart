@@ -568,8 +568,8 @@ class _PopupLayout extends SingleChildLayoutDelegate {
 }
 
 String qualityLabel(PlayQuality q) => switch (q) {
-  PlayQuality.lossless => 'FLAC (без потерь)',
-  PlayQuality.mp3 => 'MP3 320',
+  PlayQuality.lossless => 'Лучшее',
+  PlayQuality.mp3 => 'Хорошее',
   PlayQuality.low => 'Экономия трафика',
 };
 
@@ -585,8 +585,8 @@ class QualityMenu extends StatelessWidget {
         ? p.format
         : switch (p.quality) {
             PlayQuality.lossless => 'FLAC',
-            PlayQuality.mp3 => 'MP3 320',
-            PlayQuality.low => 'Эконом',
+            PlayQuality.mp3 => 'MP3',
+            PlayQuality.low => 'AAC',
           };
     return MenuAnchor(
       alignmentOffset: const Offset(0, -4),
