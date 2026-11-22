@@ -11,6 +11,12 @@ import 'controls.dart';
 import 'history_view.dart';
 import 'home_view.dart';
 
+final ButtonStyle iconRound = OutlinedButton.styleFrom(
+  minimumSize: const Size.square(46),
+  padding: EdgeInsets.zero,
+  shape: const CircleBorder(),
+);
+
 class LibraryView extends StatefulWidget {
   const LibraryView({super.key, required this.c, required this.phone, this.collection = false});
 
@@ -645,16 +651,12 @@ class ListHeader extends StatelessWidget {
           Wrap(
             spacing: 12,
             runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               FilledButton.icon(
                 onPressed: playable == 0 ? null : (here ? p.togglePlay : () => p.play(source)),
                 icon: Icon(playingHere ? Icons.pause_rounded : Icons.play_arrow_rounded),
                 label: Text(playingHere ? 'Пауза' : 'Слушать'),
-              ),
-              OutlinedButton.icon(
-                onPressed: playable < 2 ? null : () => p.playShuffled(source),
-                icon: const Icon(Icons.shuffle_rounded, size: 18),
-                label: const Text('Вперемешку'),
               ),
               if (waveable)
                 OutlinedButton.icon(
@@ -671,11 +673,22 @@ class ListHeader extends StatelessWidget {
                     _ => 'Волна по плейлисту',
                   }),
                 ),
+              Tooltip(
+                message: 'Вперемешку',
+                child: OutlinedButton(
+                  onPressed: playable < 2 ? null : () => p.playShuffled(source),
+                  style: iconRound,
+                  child: const Icon(Icons.shuffle_rounded, size: 20),
+                ),
+              ),
               if (artistOfTop(source).startsWith('http'))
-                OutlinedButton.icon(
-                  onPressed: () => c.share(artistOfTop(source)),
-                  icon: const Icon(Icons.share_outlined, size: 18),
-                  label: const Text('Поделиться'),
+                Tooltip(
+                  message: 'Поделиться',
+                  child: OutlinedButton(
+                    onPressed: () => c.share(artistOfTop(source)),
+                    style: iconRound,
+                    child: const Icon(Icons.share_outlined, size: 20),
+                  ),
                 ),
               if (!top && kind != sourceHistory)
                 DownloadButton(

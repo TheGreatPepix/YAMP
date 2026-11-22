@@ -841,7 +841,7 @@ void main() {
     c.player.panelOpen.value = false;
     c.openPage(fakePlaylist);
     await _settle(tester);
-    await tester.tap(find.widgetWithText(OutlinedButton, 'Поделиться'));
+    await tester.tap(find.byTooltip('Поделиться'));
     await tester.pump();
     await tester.pump();
     expect(copied.last, fakePlaylist);

@@ -12,6 +12,7 @@ type selfUpdate struct {
 	mu      sync.Mutex
 	checked bool
 	running bool
+	retries int
 	result  *update.Result
 }
 
@@ -49,6 +50,19 @@ func (g *App) checkUpdate(quiet bool) {
 		info := update.Check(Version)
 		info.Quiet = quiet
 		g.emit(info)
+		if !info.Quiet || info.Error != "" || !info.Available || info.CanApply {
+			return
+		}
+		g.upd.mu.Lock()
+		again := g.upd.retries < 6
+		if again {
+			g.upd.retries++
+		}
+		g.upd.mu.Unlock()
+		if again {
+			time.Sleep(10 * time.Minute)
+			g.checkUpdate(true)
+		}
 	}()
 }
 
