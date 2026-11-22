@@ -166,6 +166,18 @@ func result(path, format string) Result {
 	return r
 }
 
+func (s *Session) StreamFile(ctx context.Context, trackID string, q Quality, dst string, progress ProgressFunc) (Format, int64, error) {
+	src, err := s.audioSource(ctx, trackID, q)
+	if err != nil {
+		return Format{}, 0, err
+	}
+	n, err := s.stream(ctx, src, dst, progress)
+	if err != nil {
+		return Format{}, n, err
+	}
+	return Format{Codec: src.Codec, Bitrate: src.Bitrate, Lossless: isFlacCodec(src.Codec)}, n, nil
+}
+
 func (s *Session) stream(ctx context.Context, src source, dst string, progress ProgressFunc) (int64, error) {
 	req, err := s.newRequest(ctx, http.MethodGet, src.URL, nil, "", false)
 	if err != nil {

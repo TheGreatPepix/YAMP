@@ -14,6 +14,8 @@ import 'search.dart';
 
 enum Section { home, search, collection }
 
+enum CacheAuto { off, wifi, always }
+
 class Controller extends ChangeNotifier {
   Controller(this.core, {Desktop? desktop, AudioEngine? engine})
     : desktop = desktop ?? Desktop(),
@@ -22,6 +24,9 @@ class Controller extends ChangeNotifier {
     player.onBlocked = (message) => _notices.add(Notice(message, kind: NoticeKind.error));
     player.onShare = share;
     player.divert = remote.divert;
+    player.deviceLinked = () => remote.linkId.isNotEmpty || remote.devices.any((d) => d.paired);
+    player.deviceTargeting = () => remote.targeting;
+    player.togglePlayOnDevice = _togglePlayOnDevice;
     remote.onDiverted = (sent) => _notices.add(
       sent
           ? Notice('Включаю на компьютере «${remote.linkName}»', kind: NoticeKind.ok)
@@ -71,6 +76,12 @@ class Controller extends ChangeNotifier {
   var metered = false;
   var crossfade = true;
   var fade = 6;
+  var cacheOn = true;
+  var cacheQuality = PlayQuality.mp3;
+  var cacheLimitMB = 2048;
+  var cacheAuto = CacheAuto.off;
+  var cacheUsed = 0;
+  var cacheCount = 0;
 
   UpdateInfo? update;
   var checkingUpdate = false;
@@ -136,6 +147,32 @@ class Controller extends ChangeNotifier {
   }
 
   void recheck() => send({'cmd': 'recheck'});
+
+  void _togglePlayOnDevice() {
+    final r = remote;
+    if (r.targeting) {
+      r.target = false;
+      r.notifyListeners();
+      return;
+    }
+    if (r.linkId.isEmpty) {
+      final paired = [for (final d in r.devices) if (d.paired) d];
+      if (paired.isEmpty) {
+        _notices.add(const Notice('Сначала свяжите компьютер: меню, «Пульт для компьютера»'));
+        return;
+      }
+      r.connect(paired.first);
+    }
+    r.target = true;
+    r.notifyListeners();
+    final t = player.track;
+    final s = player.source;
+    if (t != null && s != null && s.browsable) {
+      r.divert([
+        {'cmd': 'play', 'source': s.id, 'track': t.id},
+      ]);
+    }
+  }
 
   void logout() {
     search.close();
@@ -234,6 +271,41 @@ class Controller extends ChangeNotifier {
     send({'cmd': 'prefs', 'concurrency': n});
     notifyListeners();
   }
+
+  void setCacheOn(bool on) {
+    cacheOn = on;
+    send({'cmd': 'prefs', 'cacheLimitMB': on ? (cacheLimitMB > 0 ? cacheLimitMB : 2048) : 0});
+    notifyListeners();
+  }
+
+  void setCacheQuality(PlayQuality q) {
+    cacheQuality = q;
+    send({'cmd': 'prefs', 'cacheQuality': q.name});
+    notifyListeners();
+  }
+
+  void setCacheAuto(CacheAuto m) {
+    cacheAuto = m;
+    send({'cmd': 'prefs', 'cacheAuto': m.name});
+    notifyListeners();
+  }
+
+  void setCacheLimit(int mb) {
+    cacheLimitMB = mb;
+    send({'cmd': 'prefs', 'cacheLimitMB': mb});
+    notifyListeners();
+  }
+
+  void cacheAdd(String trackId) => send({'cmd': 'cacheAdd', 'track': trackId});
+
+  void cacheLink(String link) {
+    if (link.isEmpty) return;
+    send({'cmd': 'cacheLink', 'link': link});
+  }
+
+  void cacheRemove(String trackId) => send({'cmd': 'cacheRemove', 'track': trackId});
+
+  void cacheClear() => send({'cmd': 'cacheClear'});
 
   static const compactSize = Size(380, 168);
 
@@ -426,6 +498,12 @@ class Controller extends ChangeNotifier {
         metered = ev['metered'] == true;
         crossfade = ev['crossfade'] != false;
         fade = (ev['fade'] as num?)?.toInt() ?? fade;
+        cacheOn = ev['cacheOn'] != false;
+        cacheQuality = q(ev['cacheQuality'], PlayQuality.mp3);
+        cacheLimitMB = (ev['cacheLimitMB'] as num?)?.toInt() ?? cacheLimitMB;
+        cacheAuto = CacheAuto.values.asNameMap()['${ev['cacheAuto']}'] ?? CacheAuto.off;
+        cacheUsed = (ev['cacheUsed'] as num?)?.toInt() ?? cacheUsed;
+        cacheCount = (ev['cacheCount'] as num?)?.toInt() ?? cacheCount;
         _applyFade();
         if (ev['log'] is String) log.value = ev['log'] as String;
         ready = true;
@@ -450,6 +528,12 @@ class Controller extends ChangeNotifier {
         return;
       case 'stats':
         stats.value = Stats.fromJson(ev);
+        return;
+      case 'cache':
+        cacheUsed = (ev['used'] as num?)?.toInt() ?? cacheUsed;
+        cacheCount = (ev['count'] as num?)?.toInt() ?? cacheCount;
+        player.cachedCount.value = cacheCount;
+        notifyListeners();
         return;
       case 'log':
         _appendLog('${ev['text'] ?? ''}');

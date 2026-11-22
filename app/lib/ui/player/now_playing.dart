@@ -19,6 +19,7 @@ class NowPlaying extends StatelessWidget {
     required this.phone,
     required this.onOpen,
     this.onDownload,
+    this.onCache,
     this.onCompact,
   });
 
@@ -26,6 +27,7 @@ class NowPlaying extends StatelessWidget {
   final bool phone;
   final OpenPage onOpen;
   final Download? onDownload;
+  final CacheSave? onCache;
   final VoidCallback? onCompact;
 
   void _openQueue(BuildContext context) {
@@ -93,6 +95,7 @@ class NowPlaying extends StatelessWidget {
                     track: t,
                     onOpen: onOpen,
                     onDownload: onDownload,
+                    onCache: onCache,
                     onWave: () => p.playWave(track: t),
                     onShare: p.share,
                     size: 44,
@@ -154,6 +157,11 @@ class NowPlaying extends StatelessWidget {
 }
 
 void _close(PlayerState p) => p.panelOpen.value = false;
+
+double controlsLift(BuildContext context) {
+  final height = MediaQuery.sizeOf(context).height;
+  return ((height - 560) * 0.25).clamp(0.0, 168.0);
+}
 
 class _Header extends StatelessWidget {
   const _Header({required this.p, required this.onOpen, this.trailing});
@@ -627,7 +635,7 @@ class _NarrowCover extends StatelessWidget {
         if (phone) {
           final height = MediaQuery.sizeOf(context).height;
           final art = (height - 392).clamp(180.0, 460.0).clamp(0.0, w - side * 2);
-          final lift = ((height - 560) * 0.25).clamp(0.0, 168.0);
+          final lift = controlsLift(context);
           return Padding(
             padding: EdgeInsets.only(bottom: lift),
             child: Column(
@@ -771,6 +779,8 @@ class _Actions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final onDevice = (p.deviceLinked?.call() ?? false) ? p.togglePlayOnDevice : null;
+    final targeting = p.deviceTargeting?.call() ?? false;
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
@@ -784,6 +794,14 @@ class _Actions extends StatelessWidget {
           onPressed: track.link.isEmpty ? null : () => p.share(track.link),
           icon: const Icon(Icons.share_outlined),
         ),
+        if (onDevice != null)
+          IconButton(
+            tooltip: targeting ? 'Играть на телефоне' : 'Играть на компьютере',
+            onPressed: onDevice,
+            isSelected: targeting,
+            icon: const Icon(Icons.computer_outlined),
+            selectedIcon: Icon(Icons.computer_rounded, color: context.status.accent),
+          ),
       ],
     );
   }
@@ -802,7 +820,7 @@ class _NarrowLyrics extends StatelessWidget {
   Widget build(BuildContext context) {
     final side = phone ? 16.0 : 24.0;
     return Padding(
-      padding: EdgeInsets.fromLTRB(side, 8, side, 12),
+      padding: EdgeInsets.fromLTRB(side, 8, side, 12 + (phone ? controlsLift(context) : 0)),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 640),

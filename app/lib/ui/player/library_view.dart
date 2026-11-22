@@ -17,6 +17,13 @@ final ButtonStyle iconRound = OutlinedButton.styleFrom(
   shape: const CircleBorder(),
 );
 
+final ButtonStyle iconRoundSmall = OutlinedButton.styleFrom(
+  minimumSize: const Size.square(40),
+  padding: EdgeInsets.zero,
+  shape: const CircleBorder(),
+  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+);
+
 class LibraryView extends StatefulWidget {
   const LibraryView({super.key, required this.c, required this.phone, this.collection = false});
 
@@ -124,7 +131,7 @@ class LibraryList extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return ListenableBuilder(
-      listenable: p,
+      listenable: Listenable.merge([p, p.cachedCount]),
       builder: (context, _) {
         final lib = p.library;
         Widget heading(String s) => Padding(
@@ -150,6 +157,19 @@ class LibraryList extends StatelessWidget {
               subtitle: lib.status == LoadStatus.ok || p.likedCount > 0 ? tracksCount(p.likedCount) : null,
               selected: selected == sourceLiked,
               onTap: () => onOpen(sourceLiked),
+            ),
+            _SourceTile(
+              icon: Icons.offline_pin_rounded,
+              title: 'Скачанное',
+              subtitle: p.cachedCount.value > 0 ? tracksCount(p.cachedCount.value) : null,
+              selected: selected == sourceCached,
+              onTap: () => onOpen(sourceCached),
+            ),
+            _SourceTile(
+              icon: Icons.thumb_down_off_alt_rounded,
+              title: 'Мои дизлайки',
+              selected: selected == sourceDisliked,
+              onTap: () => onOpen(sourceDisliked),
             ),
             _SourceTile(
               icon: Icons.history_rounded,
@@ -649,7 +669,7 @@ class ListHeader extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Wrap(
-            spacing: 12,
+            spacing: phone ? 8 : 12,
             runSpacing: 8,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
@@ -659,25 +679,43 @@ class ListHeader extends StatelessWidget {
                 label: Text(playingHere ? 'Пауза' : 'Слушать'),
               ),
               if (waveable)
-                OutlinedButton.icon(
-                  onPressed: () => p.playWave(
-                    source: artistOfTop(source),
-                    track: list.tracks.where((t) => !t.unavailable).firstOrNull,
-                    title: title,
-                  ),
-                  icon: const Icon(Icons.waves_rounded, size: 18),
-                  label: Text(switch (kind) {
-                    'album' => 'Волна по альбому',
-                    'artist' => 'Волна по исполнителю',
-                    'track' => 'Волна по треку',
-                    _ => 'Волна по плейлисту',
-                  }),
-                ),
+                phone
+                    ? Tooltip(
+                        message: switch (kind) {
+                          'album' => 'Волна по альбому',
+                          'artist' => 'Волна по исполнителю',
+                          'track' => 'Волна по треку',
+                          _ => 'Волна по плейлисту',
+                        },
+                        child: OutlinedButton(
+                          onPressed: () => p.playWave(
+                            source: artistOfTop(source),
+                            track: list.tracks.where((t) => !t.unavailable).firstOrNull,
+                            title: title,
+                          ),
+                          style: iconRoundSmall,
+                          child: const Icon(Icons.waves_rounded, size: 20),
+                        ),
+                      )
+                    : OutlinedButton.icon(
+                        onPressed: () => p.playWave(
+                          source: artistOfTop(source),
+                          track: list.tracks.where((t) => !t.unavailable).firstOrNull,
+                          title: title,
+                        ),
+                        icon: const Icon(Icons.waves_rounded, size: 18),
+                        label: Text(switch (kind) {
+                          'album' => 'Волна по альбому',
+                          'artist' => 'Волна по исполнителю',
+                          'track' => 'Волна по треку',
+                          _ => 'Волна по плейлисту',
+                        }),
+                      ),
               Tooltip(
                 message: 'Вперемешку',
                 child: OutlinedButton(
                   onPressed: playable < 2 ? null : () => p.playShuffled(source),
-                  style: iconRound,
+                  style: phone ? iconRoundSmall : iconRound,
                   child: const Icon(Icons.shuffle_rounded, size: 20),
                 ),
               ),
@@ -686,16 +724,18 @@ class ListHeader extends StatelessWidget {
                   message: 'Поделиться',
                   child: OutlinedButton(
                     onPressed: () => c.share(artistOfTop(source)),
-                    style: iconRound,
+                    style: phone ? iconRoundSmall : iconRound,
                     child: const Icon(Icons.share_outlined, size: 20),
                   ),
                 ),
               if (!top && kind != sourceHistory)
                 DownloadButton(
                   download: (link, q, name) => c.download(link, q, title: name),
+                  cache: c.cacheLink,
                   link: liked ? sourceLiked : source,
                   title: title,
                   label: artist ? 'Скачать дискографию' : 'Скачать',
+                  size: phone ? 40 : 48,
                 ),
             ],
           ),
@@ -850,8 +890,14 @@ class _More extends StatelessWidget {
             onPressed: () => c.share(track.link),
             child: const Text('Поделиться'),
           ),
+        if (c.cacheOn && track.cached)
+          MenuItemButton(
+            leadingIcon: const Icon(Icons.offline_pin_rounded),
+            onPressed: () => c.cacheRemove(track.id),
+            child: const Text('Удалить из кеша'),
+          ),
         if (!track.unavailable) ...[
-          ...downloadItems((link, q, name) => c.download(link, q, title: name), track.link, track.title),
+          ...downloadItems((link, q, name) => c.download(link, q, title: name), track.link, track.title, c.cacheLink),
           const Divider(height: 8),
         ],
         MenuItemButton(

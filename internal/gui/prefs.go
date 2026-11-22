@@ -17,6 +17,17 @@ const (
 	defaultConcurrency = 4
 )
 
+const (
+	defaultCacheLimitMB = 2048
+	maxCacheLimitMB     = 102400
+)
+
+const (
+	cacheAutoOff    = "off"
+	cacheAutoWifi   = "wifi"
+	cacheAutoAlways = "always"
+)
+
 type config struct {
 	Dir         string `json:"dir"`
 	Theme       string `json:"theme"`
@@ -33,6 +44,10 @@ type config struct {
 	Discord       *bool    `json:"discord,omitempty"`
 	Crossfade     *bool    `json:"crossfade,omitempty"`
 	Fade          int      `json:"fade,omitempty"`
+
+	CacheQuality string `json:"cacheQuality,omitempty"`
+	CacheLimitMB *int   `json:"cacheLimitMB,omitempty"`
+	CacheAuto    string `json:"cacheAuto,omitempty"`
 
 	Token    string `json:"token,omitempty"`
 	Refresh  string `json:"refresh,omitempty"`
@@ -106,9 +121,35 @@ func loadConfig() config {
 			if saved.Fade != 0 {
 				c.Fade = clampFade(saved.Fade)
 			}
+			c.CacheQuality = string(cacheQuality(saved.CacheQuality))
+			if saved.CacheLimitMB != nil {
+				v := clampCacheLimit(*saved.CacheLimitMB)
+				c.CacheLimitMB = &v
+			}
+			c.CacheAuto = cacheAutoMode(saved.CacheAuto)
 		}
 	}
 	return c
+}
+
+func clampCacheLimit(n int) int {
+	return max(0, min(maxCacheLimitMB, n))
+}
+
+func cacheQuality(s string) yam.Quality {
+	switch yam.Quality(s) {
+	case yam.MP3, yam.Low:
+		return yam.Quality(s)
+	}
+	return yam.MP3
+}
+
+func cacheAutoMode(s string) string {
+	switch s {
+	case cacheAutoOff, cacheAutoWifi, cacheAutoAlways:
+		return s
+	}
+	return cacheAutoOff
 }
 
 func clampConcurrency(n int) int {
@@ -190,6 +231,29 @@ func (c config) quality() yam.Quality {
 		return yam.MP3
 	}
 	return yam.Lossless
+}
+
+func (c config) cacheOn() bool {
+	return c.cacheLimitMB() > 0
+}
+
+func (c config) cacheLimitMB() int {
+	if c.CacheLimitMB == nil {
+		return defaultCacheLimitMB
+	}
+	return clampCacheLimit(*c.CacheLimitMB)
+}
+
+func (c config) cacheLimitBytes() int64 {
+	return int64(c.cacheLimitMB()) << 20
+}
+
+func (c config) cachePlayQuality() yam.Quality {
+	return cacheQuality(c.CacheQuality)
+}
+
+func (c config) cacheAutoMode() string {
+	return cacheAutoMode(c.CacheAuto)
 }
 
 func unseal(v string) string {

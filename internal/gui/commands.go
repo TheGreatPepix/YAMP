@@ -34,13 +34,16 @@ type uiCommand struct {
 	Volume      float64  `json:"volume"`
 	Seeds       []string `json:"seeds"`
 	Message     string   `json:"message"`
-	Auto        *bool    `json:"auto"`
-	Wifi        string   `json:"wifi"`
-	Mobile      string   `json:"mobile"`
-	Metered     bool     `json:"metered"`
-	Discord     *bool    `json:"discord"`
-	Crossfade   *bool    `json:"crossfade"`
-	Fade        int      `json:"fade"`
+	Auto         *bool  `json:"auto"`
+	Wifi         string `json:"wifi"`
+	Mobile       string `json:"mobile"`
+	Metered      bool   `json:"metered"`
+	Discord      *bool  `json:"discord"`
+	Crossfade    *bool  `json:"crossfade"`
+	Fade         int    `json:"fade"`
+	CacheLimit   *int   `json:"cacheLimitMB,omitempty"`
+	CacheAuto    string `json:"cacheAuto,omitempty"`
+	CacheQuality string `json:"cacheQuality,omitempty"`
 	Title       string   `json:"title"`
 	Artist      string   `json:"artist"`
 	Cover       string   `json:"cover"`
@@ -66,6 +69,7 @@ func (g *App) onMessage(message string) {
 		g.emit(acc)
 		g.jobs.emitAll()
 		g.emitPlayer("")
+		g.emitCache()
 		g.onReady()
 	case "checkUpdate":
 		g.checkUpdate(false)
@@ -157,6 +161,14 @@ func (g *App) onMessage(message string) {
 		g.retry(c.ID)
 	case "remove":
 		g.jobs.remove(c.ID)
+	case "cacheAdd":
+		g.cacheAdd(strings.TrimSpace(c.Track))
+	case "cacheLink":
+		g.cacheLink(strings.TrimSpace(c.Link))
+	case "cacheRemove":
+		g.cacheRemove(strings.TrimSpace(c.Track))
+	case "cacheClear":
+		g.cacheClear()
 	case "exit":
 		g.closeRemote()
 		g.flushResume()
@@ -209,10 +221,35 @@ func (g *App) setPrefs(c uiCommand) {
 	if c.Fade != 0 {
 		g.cfg.Fade = clampFade(c.Fade)
 	}
+	limitChanged := false
+	if c.CacheLimit != nil {
+		v := clampCacheLimit(*c.CacheLimit)
+		if g.cfg.cacheLimitMB() != v {
+			limitChanged = true
+		}
+		g.cfg.CacheLimitMB = &v
+	}
+	if c.CacheAuto != "" {
+		g.cfg.CacheAuto = cacheAutoMode(c.CacheAuto)
+	}
+	if c.CacheQuality != "" {
+		g.cfg.CacheQuality = string(cacheQuality(c.CacheQuality))
+	}
 	err := g.cfg.save()
 	g.mu.Unlock()
 	if err != nil {
 		g.notice("Не удалось сохранить настройки: "+err.Error(), "error")
+	}
+	if limitChanged && g.cache != nil {
+		g.mu.Lock()
+		limit := g.cfg.cacheLimitBytes()
+		g.mu.Unlock()
+		var current string
+		if cur, ok := g.player.currentID(); ok {
+			current = cur
+		}
+		g.cache.enforce(limit, current)
+		g.emitCache()
 	}
 	if c.Discord != nil {
 		g.applyPresence()

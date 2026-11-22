@@ -169,7 +169,7 @@ func (s *Streamer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h := w.Header()
-	h.Set("Content-Type", contentType(src.Codec))
+	h.Set("Content-Type", ContentType(src.Codec))
 	h.Set("Accept-Ranges", "bytes")
 	h.Set("Cache-Control", "no-store")
 	if v := resp.Header.Get("Content-Length"); v != "" {
@@ -241,7 +241,7 @@ func streamError(w http.ResponseWriter, err error) {
 	http.Error(w, err.Error(), status)
 }
 
-func contentType(codec string) string {
+func ContentType(codec string) string {
 	switch strings.ToLower(codec) {
 	case "flac":
 		return "audio/flac"

@@ -55,6 +55,7 @@ class _HomeViewState extends State<HomeView> {
               Problem(message: 'Не удалось загрузить главную. ${home.error}', onRetry: () => p.loadHome(force: true))
             else ...[
               if (home.personal.isNotEmpty) row('Для вас', home.personal),
+              if (home.artists.isNotEmpty) row('Любимые исполнители', home.artists),
               if (home.history.isNotEmpty)
                 row(
                   'Вы недавно слушали',

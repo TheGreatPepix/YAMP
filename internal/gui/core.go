@@ -94,6 +94,9 @@ func (c *Core) sendEvent(event any) {
 
 func (c *Core) exit() {
 	c.exiting.Do(func() {
+		if c.app.cache != nil {
+			c.app.cache.close()
+		}
 		c.sendEvent(map[string]any{"type": "exit"})
 		c.outMu.Lock()
 		c.closed = true

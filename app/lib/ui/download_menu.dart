@@ -4,13 +4,20 @@ import '../state/models.dart';
 import '../theme.dart';
 
 typedef Download = void Function(String link, Quality quality, String title);
+typedef CacheSave = void Function(String link);
 
-List<Widget> downloadItems(Download download, String link, String title) => [
+List<Widget> downloadItems(Download download, String link, String title, [CacheSave? cache]) => [
   for (final (q, label) in const [(Quality.lossless, 'Скачать FLAC'), (Quality.mp3, 'Скачать MP3 320')])
     MenuItemButton(
       leadingIcon: const Icon(Icons.download_rounded),
       onPressed: link.isEmpty ? null : () => download(link, q, title),
       child: Text(label),
+    ),
+  if (cache != null)
+    MenuItemButton(
+      leadingIcon: const Icon(Icons.offline_pin_outlined),
+      onPressed: link.isEmpty ? null : () => cache(link),
+      child: const Text('Сохранить для офлайна'),
     ),
 ];
 
@@ -20,11 +27,13 @@ class DownloadButton extends StatelessWidget {
     required this.download,
     required this.link,
     required this.title,
+    this.cache,
     this.label = 'Скачать',
     this.size = 48,
   });
 
   final Download download;
+  final CacheSave? cache;
   final String link, title, label;
   final double size;
 
@@ -32,7 +41,7 @@ class DownloadButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final accent = context.status.accent;
     return MenuAnchor(
-      menuChildren: downloadItems(download, link, title),
+      menuChildren: downloadItems(download, link, title, cache),
       builder: (context, menu, _) => IconButton(
         tooltip: label,
         onPressed: link.isEmpty ? null : () => menu.isOpen ? menu.close() : menu.open(),

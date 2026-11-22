@@ -753,6 +753,7 @@ class TrackMenu extends StatelessWidget {
     required this.track,
     required this.onOpen,
     this.onDownload,
+    this.onCache,
     this.onWave,
     this.onShare,
     this.size,
@@ -762,6 +763,7 @@ class TrackMenu extends StatelessWidget {
   final PlayTrack track;
   final OpenPage onOpen;
   final Download? onDownload;
+  final CacheSave? onCache;
   final VoidCallback? onWave;
   final void Function(String link)? onShare;
   final double? size;
@@ -770,7 +772,7 @@ class TrackMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pages = pageItems(track, onOpen);
-    final downloads = onDownload == null ? const <Widget>[] : downloadItems(onDownload!, track.link, track.title);
+    final downloads = onDownload == null ? const <Widget>[] : downloadItems(onDownload!, track.link, track.title, onCache);
     final wave = onWave;
     final shares = onShare == null ? const <Widget>[] : shareItems(track, onShare!);
     if (pages.isEmpty && downloads.isEmpty && wave == null && shares.isEmpty) return const SizedBox.shrink();

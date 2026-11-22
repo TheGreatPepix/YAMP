@@ -126,7 +126,7 @@ func TestSearchError(t *testing.T) {
 
 func TestCoreLifecycle(t *testing.T) {
 	dir := t.TempDir()
-	for _, v := range []string{"AppData", "HOME", "XDG_CONFIG_HOME"} {
+	for _, v := range []string{"AppData", "HOME", "XDG_CONFIG_HOME", "YAMP_CACHE"} {
 		t.Setenv(v, dir)
 	}
 	events := make(chan map[string]any, 64)

@@ -16,6 +16,8 @@ const sourceLiked = 'liked';
 const sourceHome = 'home';
 const sourceChart = 'chart';
 const sourceHistory = 'history';
+const sourceDisliked = 'disliked';
+const sourceCached = 'cached';
 
 String topTracksOf(String artist) => '$artist/tracks';
 
@@ -56,6 +58,7 @@ class PlayTrack {
     this.liked = false,
     this.disliked = false,
     this.unavailable = false,
+    this.cached = false,
     this.link = '',
     this.lyrics = '',
   });
@@ -74,6 +77,7 @@ class PlayTrack {
     liked: j['liked'] == true,
     disliked: j['disliked'] == true,
     unavailable: j['unavailable'] == true,
+    cached: j['cached'] == true,
     link: _s(j['link']),
     lyrics: _s(j['lyrics']),
   );
@@ -81,7 +85,7 @@ class PlayTrack {
   final String id, albumId, title, artist, album, albumSource, cover, link, lyrics;
   final List<PlayArtist> artists;
   final int durationMs;
-  final bool explicit, liked, disliked, unavailable;
+  final bool explicit, liked, disliked, unavailable, cached;
 
   Duration get duration => Duration(milliseconds: durationMs);
 
@@ -226,12 +230,13 @@ class HomeFeed {
     this.history = const [],
     this.releases = const [],
     this.playlists = const [],
+    this.artists = const [],
     this.chart = const [],
     this.error = '',
   });
 
   final LoadStatus status;
-  final List<SearchHit> personal, history, releases, playlists;
+  final List<SearchHit> personal, history, releases, playlists, artists;
   final List<PlayTrack> chart;
   final String error;
 }
@@ -344,6 +349,7 @@ class PlayerState extends ChangeNotifier {
 
   final panelOpen = ValueNotifier(false);
   final lyricsOpen = ValueNotifier(false);
+  final cachedCount = ValueNotifier(0);
   final lyrics = <String, Lyrics>{};
   final browse = ValueNotifier(sourceHome);
   final browsing = ValueNotifier(false);
@@ -422,6 +428,7 @@ class PlayerState extends ChangeNotifier {
                 history: _hits(ev['history']),
                 releases: _hits(ev['releases']),
                 playlists: _hits(ev['playlists']),
+                artists: _hits(ev['artists']),
                 chart: _tracks(ev['chart']),
               );
       case 'library':
@@ -689,6 +696,10 @@ class PlayerState extends ChangeNotifier {
 
   void Function(String message)? onBlocked;
 
+  bool Function()? deviceLinked;
+  bool Function()? deviceTargeting;
+  void Function()? togglePlayOnDevice;
+
   void Function(String link)? onShare;
 
   void share(String link) {
@@ -769,7 +780,9 @@ class PlayerState extends ChangeNotifier {
       _pending = to;
       return;
     }
+    _handoff = null;
     engine.seek(to);
+    _crossfade(to);
     _reportPlayback();
   }
 
@@ -894,6 +907,7 @@ class PlayerState extends ChangeNotifier {
     duration.dispose();
     panelOpen.dispose();
     lyricsOpen.dispose();
+    cachedCount.dispose();
     browse.dispose();
     browsing.dispose();
     engine.dispose();

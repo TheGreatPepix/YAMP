@@ -11,7 +11,7 @@ import (
 	"yamp/internal/yam"
 )
 
-const Version = "0.2.5"
+const Version = "0.3.0"
 
 const (
 	accNone     = "none"
@@ -30,6 +30,8 @@ type App struct {
 	player *playerState
 	stream *streamServer
 	remote *remoteHub
+	cache  *trackCache
+	cacher *cacher
 
 	mu      sync.Mutex
 	cfg     config
@@ -67,6 +69,13 @@ func newApp() *App {
 
 func (g *App) start() {
 	g.jobs = newManager(g, g.cfg.Concurrency)
+	if cache, err := newTrackCache(); err != nil {
+		g.logf("Кеш: %v", err)
+	} else {
+		g.cache = cache
+		g.stream.cache = cache
+		g.cacher = newCacher(g, cache)
+	}
 	g.startUpdates()
 	g.startRemote()
 	if g.token != "" {

@@ -192,6 +192,7 @@ class MediaKitEngine implements AudioEngine {
     _length = length;
     _progress = 0;
     _ramping = false;
+    _startRamp();
     await loading;
     if (gen != _gen) return;
     await p.play();

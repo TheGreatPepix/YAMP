@@ -30,16 +30,17 @@ func (g *App) home() {
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		var personal, history, releases, playlists []yam.Hit
+		var personal, history, releases, playlists, artists []yam.Hit
 		var chart *trackList
-		errs := make([]error, 5)
+		errs := make([]error, 6)
 		var wg sync.WaitGroup
-		wg.Add(5)
+		wg.Add(6)
 		go func() { defer wg.Done(); personal, errs[0] = sess.PersonalPlaylists(ctx) }()
 		go func() { defer wg.Done(); history, errs[1] = sess.History(ctx, homeRow) }()
 		go func() { defer wg.Done(); releases, errs[2] = sess.NewReleases(ctx, homeRow) }()
 		go func() { defer wg.Done(); playlists, errs[3] = sess.NewPlaylists(ctx, homeRow) }()
 		go func() { defer wg.Done(); chart, errs[4] = g.loadSource(ctx, sess, yam.ChartLink) }()
+		go func() { defer wg.Done(); artists, errs[5] = sess.LikedArtists(ctx, sess.Account().UID) }()
 		wg.Wait()
 
 		failed := 0
@@ -61,6 +62,7 @@ func (g *App) home() {
 		ev["history"] = hitEvents(history)
 		ev["releases"] = hitEvents(releases)
 		ev["playlists"] = hitEvents(playlists)
+		ev["artists"] = hitEvents(artists)
 		if chart != nil {
 			top := chart.Tracks[:min(homeChart, len(chart.Tracks))]
 			g.player.mu.Lock()

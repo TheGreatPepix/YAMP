@@ -14,6 +14,7 @@ class MiniPlayer extends StatelessWidget {
     required this.phone,
     required this.onOpen,
     this.onDownload,
+    this.onCache,
     this.onCompact,
   });
 
@@ -21,6 +22,7 @@ class MiniPlayer extends StatelessWidget {
   final bool phone;
   final OpenPage onOpen;
   final Download? onDownload;
+  final CacheSave? onCache;
   final VoidCallback? onCompact;
 
   @override
@@ -29,7 +31,9 @@ class MiniPlayer extends StatelessWidget {
       listenable: p,
       builder: (context, _) {
         if (!p.hasTrack && !p.loading) return const SizedBox.shrink();
-        return phone ? _Phone(p: p) : _Desktop(p: p, onOpen: onOpen, onDownload: onDownload, onCompact: onCompact);
+        return phone
+            ? _Phone(p: p)
+            : _Desktop(p: p, onOpen: onOpen, onDownload: onDownload, onCache: onCache, onCompact: onCompact);
       },
     );
   }
@@ -103,11 +107,12 @@ class _NowTitle extends StatelessWidget {
 }
 
 class _Desktop extends StatelessWidget {
-  const _Desktop({required this.p, required this.onOpen, this.onDownload, this.onCompact});
+  const _Desktop({required this.p, required this.onOpen, this.onDownload, this.onCache, this.onCompact});
 
   final PlayerState p;
   final OpenPage onOpen;
   final Download? onDownload;
+  final CacheSave? onCache;
   final VoidCallback? onCompact;
 
   @override
@@ -142,6 +147,7 @@ class _Desktop extends StatelessWidget {
                           track: t,
                           onOpen: onOpen,
                           onDownload: onDownload,
+                          onCache: onCache,
                           onWave: () => p.playWave(track: t),
                           onShare: p.share,
                         ),

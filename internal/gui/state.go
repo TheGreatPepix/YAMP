@@ -17,7 +17,15 @@ type uiState struct {
 	Metered     bool   `json:"metered"`
 	Crossfade   bool   `json:"crossfade"`
 	Fade        int    `json:"fade"`
-	Log         string `json:"log,omitempty"`
+
+	CacheOn      bool   `json:"cacheOn"`
+	CacheQuality string `json:"cacheQuality"`
+	CacheLimitMB int    `json:"cacheLimitMB"`
+	CacheAuto    string `json:"cacheAuto"`
+	CacheUsed    int64  `json:"cacheUsed"`
+	CacheCount   int    `json:"cacheCount"`
+
+	Log string `json:"log,omitempty"`
 }
 
 func (g *App) emitState(withLog bool) {
@@ -39,6 +47,13 @@ func (g *App) emitState(withLog bool) {
 		Metered:     g.metered,
 		Crossfade:   g.cfg.crossfade(),
 		Fade:        g.cfg.fade(),
+		CacheOn:     g.cfg.cacheOn(),
+		CacheQuality: string(g.cfg.cachePlayQuality()),
+		CacheLimitMB: g.cfg.cacheLimitMB(),
+		CacheAuto:   g.cfg.cacheAutoMode(),
+	}
+	if g.cache != nil {
+		s.CacheUsed, s.CacheCount = g.cache.stats()
 	}
 	g.mu.Unlock()
 	if withLog {

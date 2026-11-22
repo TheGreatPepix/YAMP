@@ -33,6 +33,7 @@ func Start(filesDir, cacheDir, musicDir string, s Sink) {
 	os.Setenv("XDG_CONFIG_HOME", filepath.Join(filesDir, "config"))
 	os.Setenv("TMPDIR", cacheDir)
 	gui.DefaultDir = musicDir
+	gui.CacheDir = filepath.Join(cacheDir, "yamp")
 	c := gui.Start(emit)
 	core = c
 	go func() {

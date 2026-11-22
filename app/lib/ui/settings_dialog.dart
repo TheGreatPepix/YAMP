@@ -18,6 +18,7 @@ Future<void> showSettingsDialog(BuildContext context, Controller c) {
 enum _Section {
   listening('Прослушивание', Icons.headphones_rounded),
   downloads('Загрузки', Icons.download_rounded),
+  cache('Кеш для офлайна', Icons.offline_pin_rounded),
   look('Оформление', Icons.palette_outlined),
   remote('Пульт с телефона', Icons.phonelink_ring_rounded),
   about('О программе', Icons.info_outline_rounded);
@@ -38,6 +39,7 @@ String _summary(Controller c, _Section s) => switch (s) {
   _Section.listening =>
     c.playAuto ? 'Авто: Wi-Fi ${_short(c.playWifi)}, мобильный ${_short(c.playMobile)}' : _short(c.playManual),
   _Section.downloads => '${c.quality == Quality.lossless ? 'FLAC' : 'MP3 320'}, одновременно ${c.concurrency}',
+  _Section.cache => c.cacheOn ? 'Занято ${_gb(c.cacheUsed)} из ${_gb(c.cacheLimitMB * 1024 * 1024)}' : 'Выключен',
   _Section.look => switch (c.theme) {
     ThemeChoice.system => 'Системная тема',
     ThemeChoice.light => 'Светлая тема',
@@ -80,6 +82,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
   Widget _content(_Section s) => switch (s) {
     _Section.listening => _Listening(c: c),
     _Section.downloads => _Downloads(c: c),
+    _Section.cache => _Cache(c: c),
     _Section.look => _Look(c: c),
     _Section.remote => RemoteHostSection(r: c.remote),
     _Section.about => _About(c: c),
@@ -489,6 +492,106 @@ class _Downloads extends StatelessWidget {
       ],
     );
   }
+}
+
+class _Cache extends StatelessWidget {
+  const _Cache({required this.c});
+
+  final Controller c;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Кеш для офлайна'),
+          subtitle: const _Hint(
+            'Треки сохраняются в память устройства и играют без сети. '
+            'В очереди и меню трека их можно сохранить и удалить.',
+          ),
+          value: c.cacheOn,
+          onChanged: c.setCacheOn,
+        ),
+        if (c.cacheOn) ...[
+          const SizedBox(height: 18),
+          const _Label('Качество кеша'),
+          SegmentedButton<PlayQuality>(
+            showSelectedIcon: false,
+            segments: const [
+              ButtonSegment(value: PlayQuality.lossless, label: Text('Лучшее')),
+              ButtonSegment(value: PlayQuality.mp3, label: Text('Хорошее')),
+              ButtonSegment(value: PlayQuality.low, label: Text('Эконом')),
+            ],
+            selected: {c.cacheQuality},
+            onSelectionChanged: (s) => c.setCacheQuality(s.first),
+          ),
+          const SizedBox(height: 8),
+          _Hint(qualityHint(c.cacheQuality)),
+          const SizedBox(height: 22),
+          const _Label('Автосохранение любимых'),
+          SegmentedButton<CacheAuto>(
+            showSelectedIcon: false,
+            segments: const [
+              ButtonSegment(value: CacheAuto.off, label: Text('Выключено')),
+              ButtonSegment(value: CacheAuto.wifi, label: Text('По Wi-Fi')),
+              ButtonSegment(value: CacheAuto.always, label: Text('Всегда')),
+            ],
+            selected: {c.cacheAuto},
+            onSelectionChanged: (s) => c.setCacheAuto(s.first),
+          ),
+          const SizedBox(height: 8),
+          const _Hint(
+            'Трек, прослушанный до конца несколько раз, сохранится сам. '
+            'По мобильному интернету не больше пяти треков в день.',
+          ),
+          const SizedBox(height: 22),
+          Row(
+            children: [
+              const Expanded(child: _Label('Размер кеша')),
+              Text(_gb(c.cacheLimitMB * 1024 * 1024), style: text.titleMedium?.copyWith(color: context.status.accent)),
+            ],
+          ),
+          Slider(
+            min: 128,
+            max: 10240,
+            divisions: 79,
+            value: c.cacheLimitMB.clamp(128, 10240).toDouble(),
+            label: _gb(c.cacheLimitMB * 1024 * 1024),
+            onChanged: (v) => c.setCacheLimit(v.round()),
+          ),
+          const _Hint('Самые давно не прослушанные треки удаляются, когда кеш заполняется.'),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  c.cacheCount == 0
+                      ? 'Кеш пуст'
+                      : 'Треков: ${c.cacheCount}, занято ${_gb(c.cacheUsed)}',
+                  style: text.bodyMedium,
+                ),
+              ),
+              FilledButton.tonal(
+                onPressed: c.cacheCount == 0 ? null : c.cacheClear,
+                child: const Text('Очистить'),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+String _gb(int bytes) {
+  if (bytes <= 0) return '0 МБ';
+  const mb = 1024 * 1024;
+  if (bytes < 1024 * mb) return '${(bytes / mb).round()} МБ';
+  final gb = bytes / (1024 * mb);
+  return gb >= 10 ? '${gb.round()} ГБ' : '${(gb * 10).round() / 10} ГБ';
 }
 
 class _Look extends StatelessWidget {

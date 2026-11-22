@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -126,6 +127,35 @@ func playlistHits(list []apiSearchPlaylist) []Hit {
 		}
 	}
 	return out
+}
+
+func (c *Client) LikedArtists(ctx context.Context, uid int64) ([]Hit, error) {
+	var r struct {
+		Library struct {
+			Artists []json.RawMessage `json:"artists"`
+		} `json:"library"`
+	}
+	if err := c.api(ctx, http.MethodGet, userPath(uid)+"/likes/artists", nil, &r); err != nil {
+		return nil, err
+	}
+	out := make([]Hit, 0, len(r.Library.Artists))
+	for _, raw := range r.Library.Artists {
+		var wrap struct {
+			Artist *apiSearchArtist `json:"artist"`
+		}
+		var a apiSearchArtist
+		switch {
+		case json.Unmarshal(raw, &wrap) == nil && wrap.Artist != nil:
+			a = *wrap.Artist
+		case json.Unmarshal(raw, &a) == nil && a.ID != "":
+		default:
+			continue
+		}
+		if h := artistHit(a); h.Link != "" {
+			out = append(out, h)
+		}
+	}
+	return out, nil
 }
 
 const trackBatch = 200

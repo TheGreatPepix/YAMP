@@ -14,9 +14,11 @@ import (
 )
 
 const (
-	sourceWave    = "wave"
-	sourceLiked   = "liked"
-	sourceHistory = "history"
+	sourceWave     = "wave"
+	sourceLiked    = "liked"
+	sourceHistory  = "history"
+	sourceDisliked = "disliked"
+	sourceCached   = "cached"
 
 	playFrom      = "desktop_win-yamp-player-default"
 	restartAfter  = 3.0
@@ -99,6 +101,7 @@ type playTrack struct {
 	Liked       bool         `json:"liked,omitempty"`
 	Disliked    bool         `json:"disliked,omitempty"`
 	Unavailable bool         `json:"unavailable,omitempty"`
+	Cached      bool         `json:"cached,omitempty"`
 	Link        string       `json:"link,omitempty"`
 	Lyrics      string       `json:"lyrics,omitempty"`
 }
@@ -216,6 +219,16 @@ func newPlayerState(cfg config) *playerState {
 	p.queue.SetRepeat(player.ParseRepeat(cfg.Repeat))
 	p.queue.SetShuffle(cfg.Shuffle)
 	return p
+}
+
+func (p *playerState) currentID() (string, bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	cur, ok := p.queue.Current()
+	if !ok {
+		return "", false
+	}
+	return cur.ID, true
 }
 
 func (p *playerState) shape(t yam.Track, cover string) playTrack {
@@ -398,6 +411,28 @@ func (g *App) loadSource(ctx context.Context, sess *yam.Session, source string) 
 			return nil, err
 		}
 		list = &trackList{Source: playSource{Kind: sourceLiked, ID: sourceLiked, Title: "Мне нравится"}, Tracks: tracks}
+	} else if source == sourceDisliked {
+		ids, err := sess.DislikedTrackIDs(ctx, sess.Account().UID)
+		if err != nil {
+			return nil, err
+		}
+		tracks, err := sess.Tracks(ctx, ids)
+		if err != nil {
+			return nil, err
+		}
+		list = &trackList{Source: playSource{Kind: "playlist", ID: sourceDisliked, Title: "Мои дизлайки"}, Tracks: tracks}
+	} else if source == sourceCached {
+		if g.cache == nil {
+			return nil, errors.New("кеш недоступен")
+		}
+		var tracks []yam.Track
+		for _, e := range g.cache.listAll() {
+			tracks = append(tracks, yam.Track{
+				ID: e.ID, Title: e.Title, Artists: e.Artist, Cover: e.Cover,
+				Duration: e.Duration, Available: true,
+			})
+		}
+		list = &trackList{Source: playSource{Kind: "playlist", ID: sourceCached, Title: "Скачанное"}, Tracks: tracks}
 	} else if source == sourceHistory {
 		days, err := sess.HistoryDays(ctx)
 		if err != nil {
@@ -854,6 +889,9 @@ func (g *App) moveOn(trackID string, played float64, ended, onward bool, step fu
 
 	if ok && sess != nil && played > 0 {
 		p.reports.run(func() { g.reportPlay(sess, cur, snapshot, played, played, ended) })
+		if cur.Duration > 0 && played >= float64(cur.Duration)/1000*fullListen {
+			go g.autoCache(cur)
+		}
 	}
 	if w != nil && sess != nil {
 		g.waveRefill(sess)
@@ -954,6 +992,9 @@ func (g *App) playerFailed(trackID, message string, position float64) {
 }
 
 func (g *App) offline(trackID string) bool {
+	if g.cache != nil && g.cache.has(trackID) {
+		return false
+	}
 	g.mu.Lock()
 	q := g.cfg.playback(g.metered)
 	g.mu.Unlock()
@@ -1224,6 +1265,23 @@ func (g *App) emitPlayer(action string) {
 	}
 	p.mu.Unlock()
 
+	if g.cache != nil {
+		ids := make([]string, 0, 2)
+		if ev.Track != nil {
+			ids = append(ids, ev.Track.ID)
+		}
+		if ev.Next != nil {
+			ids = append(ids, ev.Next.ID)
+		}
+		cached := g.cache.cachedIDs(ids)
+		if ev.Track != nil {
+			ev.Track.Cached = cached[ev.Track.ID]
+		}
+		if ev.Next != nil {
+			ev.Next.Cached = cached[ev.Next.ID]
+		}
+	}
+
 	if ev.Track == nil {
 		if action == actPlay || action == actResume || action == actRetry || action == actRestore {
 			ev.Action = actStop
@@ -1273,11 +1331,21 @@ func (g *App) emitQueue() {
 func (g *App) queueSnapshot() queueEvent {
 	p := g.player
 	p.mu.Lock()
-	defer p.mu.Unlock()
 	ev := queueEvent{Type: "queue", Pos: p.queue.Pos(), Tracks: p.shapeAll(p.queue.Tracks())}
 	if p.source != nil {
 		src := *p.source
 		ev.Source = &src
+	}
+	p.mu.Unlock()
+	if g.cache != nil && len(ev.Tracks) > 0 {
+		ids := make([]string, len(ev.Tracks))
+		for i, t := range ev.Tracks {
+			ids[i] = t.ID
+		}
+		cached := g.cache.cachedIDs(ids)
+		for i := range ev.Tracks {
+			ev.Tracks[i].Cached = cached[ev.Tracks[i].ID]
+		}
 	}
 	return ev
 }
