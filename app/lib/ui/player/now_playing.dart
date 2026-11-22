@@ -649,12 +649,10 @@ class _NarrowCover extends StatelessWidget {
                     kind: ReleaseKind.track,
                   ),
                 ),
-                Expanded(
-                  child: Center(
-                    child: column([_Info(p: p, track: track, onOpen: onOpen)]),
-                  ),
-                ),
+                const Expanded(child: SizedBox()),
                 column([
+                  _Info(p: p, track: track, onOpen: onOpen),
+                  const SizedBox(height: 12),
                   SeekBar(p: p),
                   const SizedBox(height: 4),
                   _Transport(p: p, skip: 52, play: w < 360 ? 64 : 72),
@@ -975,7 +973,7 @@ class _QueueScrollState extends State<_QueueScroll> {
                     onOpen: widget.onOpen,
                     onTap: () => i == p.pos ? p.togglePlay() : p.jump(i),
                   ),
-                  childCount: queue.length,
+                  childCount: p.pos + 1 < queue.length ? p.pos + 1 : queue.length,
                 ),
               ),
             ),

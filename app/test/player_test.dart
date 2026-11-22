@@ -149,16 +149,12 @@ void main() {
     expect(find.text('Сейчас играет'), findsOneWidget);
     expect(find.text('Очередь'), findsOneWidget);
     expect(find.text('3 из 7'), findsOneWidget);
-    final inPanel = find.descendant(of: find.byType(NowPlaying), matching: find.text('Перемен'));
-    await tester.scrollUntilVisible(
-      inPanel,
-      100,
-      scrollable: find.descendant(of: find.byType(NowPlaying), matching: find.byType(Scrollable)).last,
-    );
+    final inPanel = find.descendant(of: find.byType(NowPlaying), matching: find.text('Кукушка'));
+    expect(inPanel, findsOneWidget);
     await tester.tap(inPanel);
     await _settle(tester);
-    expect(c.player.track!.title, 'Перемен');
-    expect(find.text('6 из 7'), findsOneWidget);
+    expect(c.player.track!.title, 'Кукушка');
+    expect(find.text('2 из 7'), findsOneWidget);
     expect(find.text('Кукушка'), findsWidgets);
 
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
@@ -774,12 +770,12 @@ void main() {
     await _settle(tester);
     c.player.panelOpen.value = true;
     await _settle(tester);
-    final row = find.descendant(of: find.byType(QueueRow), matching: _link('Аквариум'));
+    final row = find.descendant(of: find.byType(QueueRow), matching: _link('Кино'));
     await _tapLink(tester, row);
     await _settle(tester);
     expect(c.player.panelOpen.value, isFalse);
-    expect(c.player.browse.value, fakeArtist('Аквариум'));
-    expect(find.text('Аквариум'), findsWidgets);
+    expect(c.player.browse.value, fakeArtist('Кино'));
+    expect(find.text('Кино'), findsWidgets);
     expect(c.player.track!.title, 'Звезда по имени Солнце');
     await core.close();
   });

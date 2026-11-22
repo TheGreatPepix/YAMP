@@ -185,7 +185,7 @@ class _Line extends StatelessWidget {
   final Duration end;
   final VoidCallback? onTap;
 
-  Widget _text() {
+  Widget _text(BuildContext context) {
     final empty = line.text.isEmpty;
     if (!active || words.isEmpty) {
       return Text(empty ? '· · ·' : line.text);
@@ -204,13 +204,20 @@ class _Line extends StatelessWidget {
     return ValueListenableBuilder<Duration>(
       valueListenable: listenable,
       builder: (context, pos, _) {
-        return Text.rich(
-          TextSpan(
-            children: [
-              for (var i = 0; i < words.length; i++)
-                TextSpan(text: words[i].text, style: TextStyle(color: at(i, pos))),
-            ],
-          ),
+        return TweenAnimationBuilder<double>(
+          tween: Tween<double>(end: pos.inMicroseconds.toDouble()),
+          duration: motion(context, const Duration(milliseconds: 240)),
+          builder: (context, v, _) {
+            final atPos = Duration(microseconds: v.round());
+            return Text.rich(
+              TextSpan(
+                children: [
+                  for (var i = 0; i < words.length; i++)
+                    TextSpan(text: words[i].text, style: TextStyle(color: at(i, atPos))),
+                ],
+              ),
+            );
+          },
         );
       },
     );
@@ -228,7 +235,7 @@ class _Line extends StatelessWidget {
         letterSpacing: -0.01 * size,
         color: color,
       ),
-      child: _text(),
+      child: _text(context),
     );
     final pad = EdgeInsets.symmetric(vertical: size * 0.22, horizontal: 8);
     if (onTap == null) return Padding(padding: pad, child: text);
