@@ -1,10 +1,10 @@
 <h1 align="center">YAMP · Yet Another Music Player</h1>
 
 <p align="center">
-  <a href="../../releases/latest"><img alt="версия" src="https://img.shields.io/github/v/release/TheGreatPepix/YAMP?style=for-the-badge&labelColor=1A1600&label=%D0%B2%D0%B5%D1%80%D1%81%D0%B8%D1%8F&color=FFD43B"></a>
-  <a href="../../releases"><img alt="скачиваний" src="https://img.shields.io/github/downloads/TheGreatPepix/YAMP/total?style=for-the-badge&labelColor=1A1600&label=%D1%81%D0%BA%D0%B0%D1%87%D0%B8%D0%B2%D0%B0%D0%BD%D0%B8%D0%B9&color=FF9E1B"></a>
-  <a href="../../actions/workflows/build.yml"><img alt="сборка" src="https://img.shields.io/github/actions/workflow/status/TheGreatPepix/YAMP/build.yml?style=for-the-badge&labelColor=1A1600&label=%D1%81%D0%B1%D0%BE%D1%80%D0%BA%D0%B0&color=3DDC84"></a>
-  <a href="LICENSE"><img alt="лицензия" src="https://img.shields.io/badge/%D0%BB%D0%B8%D1%86%D0%B5%D0%BD%D0%B7%D0%B8%D1%8F-GPL--3.0-2A2A33?style=for-the-badge&labelColor=1A1600"></a>
+  <a href="https://github.com/TheGreatPepix/YAMP/releases/latest"><img alt="версия" src="https://img.shields.io/github/v/release/TheGreatPepix/YAMP?style=for-the-badge&labelColor=1A1600&label=%D0%B2%D0%B5%D1%80%D1%81%D0%B8%D1%8F&color=FFD43B"></a>
+  <a href="https://github.com/TheGreatPepix/YAMP/releases"><img alt="скачиваний" src="https://img.shields.io/github/downloads/TheGreatPepix/YAMP/total?style=for-the-badge&labelColor=1A1600&label=%D1%81%D0%BA%D0%B0%D1%87%D0%B8%D0%B2%D0%B0%D0%BD%D0%B8%D0%B9&color=FF9E1B"></a>
+  <a href="https://github.com/TheGreatPepix/YAMP/actions/workflows/build.yml"><img alt="сборка" src="https://img.shields.io/github/actions/workflow/status/TheGreatPepix/YAMP/build.yml?style=for-the-badge&labelColor=1A1600&label=%D1%81%D0%B1%D0%BE%D1%80%D0%BA%D0%B0&color=3DDC84"></a>
+  <a href="https://github.com/TheGreatPepix/YAMP/blob/main/LICENSE"><img alt="лицензия" src="https://img.shields.io/badge/%D0%BB%D0%B8%D1%86%D0%B5%D0%BD%D0%B7%D0%B8%D1%8F-GPL--3.0-2A2A33?style=for-the-badge&labelColor=1A1600"></a>
 </p>
 
 <p align="center">
@@ -97,7 +97,7 @@ YAMP на компьютере, и музыкой можно управлять 
 
 ## Скачать
 
-Свежая версия всегда на странице [релизов](../../releases):
+Свежая версия всегда на странице [релизов](https://github.com/TheGreatPepix/YAMP/releases):
 
 | Где | Что скачать |
 |---|---|
@@ -125,7 +125,7 @@ sudo pacman -S mpv            # Arch
 
 ## Важно
 
-Код YAMP открыт по лицензии [GPL-3.0](LICENSE), © 2026 TheGreatPepix.
+Код YAMP открыт по лицензии [GPL-3.0](https://github.com/TheGreatPepix/YAMP/blob/main/LICENSE), © 2026 TheGreatPepix.
 
 YAMP неофициальный проект и не связан с компанией «Яндекс». «Яндекс», «Яндекс
 Музыка» и «Яндекс Плюс» являются товарными знаками их правообладателей.
