@@ -108,8 +108,6 @@ class NowPlaying extends StatelessWidget {
                         ],
                       ],
                     );
-                    final edge = onCompact != null ? 164.0 : 112.0;
-                    final rightEdge = onCompact != null ? 240.0 : 192.0;
                     return lyrics
                         ? _WideLyrics(
                             p: p,
@@ -118,8 +116,6 @@ class NowPlaying extends StatelessWidget {
                             onOpen: onOpen,
                             menu: menu,
                             trailing: trailing,
-                            edge: edge,
-                            rightEdge: rightEdge,
                           )
                         : _WideCover(
                             p: p,
@@ -128,8 +124,6 @@ class NowPlaying extends StatelessWidget {
                             onOpen: onOpen,
                             menu: menu,
                             trailing: trailing,
-                            edge: edge,
-                            rightEdge: rightEdge,
                           );
                   }
                   if (lyrics) return _NarrowLyrics(p: p, track: t, phone: phone, onOpen: onOpen, compact: compact);
@@ -162,13 +156,11 @@ class NowPlaying extends StatelessWidget {
 void _close(PlayerState p) => p.panelOpen.value = false;
 
 class _Header extends StatelessWidget {
-  const _Header({required this.p, required this.onOpen, this.trailing, this.edge = 48, this.rightEdge});
+  const _Header({required this.p, required this.onOpen, this.trailing});
 
   final PlayerState p;
   final OpenPage onOpen;
   final Widget? trailing;
-  final double edge;
-  final double? rightEdge;
 
   @override
   Widget build(BuildContext context) {
@@ -176,46 +168,45 @@ class _Header extends StatelessWidget {
     final text = Theme.of(context).textTheme;
     final from = p.source;
     final source = from?.title ?? '';
+    final pad = (MediaQuery.sizeOf(context).width * 0.3).clamp(64.0, 96.0);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Row(
+      child: Stack(
         children: [
-          SizedBox(
-            width: edge,
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: IconButton(
-                tooltip: 'Свернуть плеер',
-                icon: const Icon(Icons.expand_more_rounded),
-                onPressed: () => _close(p),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: IconButton(
+              tooltip: 'Свернуть плеер',
+              icon: const Icon(Icons.expand_more_rounded),
+              onPressed: () => _close(p),
+            ),
+          ),
+          Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: pad),
+              child: Column(
+                children: [
+                  Semantics(
+                    header: true,
+                    child: Text('Сейчас играет', style: text.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                  ),
+                  if (source.isNotEmpty)
+                    Tooltip(
+                      message: from!.browsable ? 'Открыть «$source»' : source,
+                      child: LinkText(
+                        parts: [LinkPart(source, from.browsable ? from.id : '')],
+                        onOpen: onOpen,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
+                      ),
+                    ),
+                ],
               ),
             ),
           ),
-          Expanded(
-            child: Column(
-              children: [
-                Semantics(
-                  header: true,
-                  child: Text('Сейчас играет', style: text.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
-                ),
-                if (source.isNotEmpty)
-                  Tooltip(
-                    message: from!.browsable ? 'Открыть «$source»' : source,
-                    child: LinkText(
-                      parts: [LinkPart(source, from.browsable ? from.id : '')],
-                      onOpen: onOpen,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          Flexible(
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: trailing ?? SizedBox(width: rightEdge ?? edge),
-            ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: trailing ?? const SizedBox.shrink(),
           ),
         ],
       ),
@@ -388,8 +379,6 @@ class _WideCover extends StatelessWidget {
     required this.onOpen,
     required this.menu,
     required this.trailing,
-    required this.edge,
-    required this.rightEdge,
   });
 
   final PlayerState p;
@@ -397,7 +386,6 @@ class _WideCover extends StatelessWidget {
   final BoxConstraints box;
   final OpenPage onOpen;
   final Widget menu, trailing;
-  final double edge, rightEdge;
 
   @override
   Widget build(BuildContext context) {
@@ -408,7 +396,7 @@ class _WideCover extends StatelessWidget {
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: side),
-          child: _Header(p: p, onOpen: onOpen, edge: edge, rightEdge: rightEdge, trailing: trailing),
+          child: _Header(p: p, onOpen: onOpen, trailing: trailing),
         ),
         Expanded(
           child: Padding(
@@ -488,8 +476,6 @@ class _WideLyrics extends StatelessWidget {
     required this.onOpen,
     required this.menu,
     required this.trailing,
-    required this.edge,
-    required this.rightEdge,
   });
 
   final PlayerState p;
@@ -497,7 +483,6 @@ class _WideLyrics extends StatelessWidget {
   final BoxConstraints box;
   final OpenPage onOpen;
   final Widget menu, trailing;
-  final double edge, rightEdge;
 
   @override
   Widget build(BuildContext context) {
@@ -510,7 +495,7 @@ class _WideLyrics extends StatelessWidget {
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: _Header(p: p, onOpen: onOpen, edge: edge, rightEdge: rightEdge, trailing: trailing),
+          child: _Header(p: p, onOpen: onOpen, trailing: trailing),
         ),
         Expanded(
           child: Padding(
@@ -642,47 +627,49 @@ class _NarrowCover extends StatelessWidget {
         if (phone) {
           final height = MediaQuery.sizeOf(context).height;
           final art = (height - 392).clamp(180.0, 460.0).clamp(0.0, w - side * 2);
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _Header(
-                p: p,
-                onOpen: onOpen,
-                edge: 48,
-                rightEdge: 96,
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [_QueueButton(onPressed: onQueue), menu],
+          final lift = ((height - 560) * 0.25).clamp(0.0, 168.0);
+          return Padding(
+            padding: EdgeInsets.only(bottom: lift),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _Header(
+                  p: p,
+                  onOpen: onOpen,
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [_QueueButton(onPressed: onQueue), menu],
+                  ),
                 ),
-              ),
-              Center(
-                child: Cover(
-                  url: p.art.isNotEmpty ? p.art : track.cover,
-                  size: art,
-                  radius: 12,
-                  kind: ReleaseKind.track,
+                Center(
+                  child: Cover(
+                    url: p.art.isNotEmpty ? p.art : track.cover,
+                    size: art,
+                    radius: 12,
+                    kind: ReleaseKind.track,
+                  ),
                 ),
-              ),
-              Expanded(
-                child: Center(
-                  child: column([_Info(p: p, track: track, onOpen: onOpen)]),
+                Expanded(
+                  child: Center(
+                    child: column([_Info(p: p, track: track, onOpen: onOpen)]),
+                  ),
                 ),
-              ),
-              column([
-                SeekBar(p: p),
-                const SizedBox(height: 4),
-                _Transport(p: p, skip: 52, play: w < 360 ? 64 : 72),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    QualityMenu(p: p),
-                    const Spacer(),
-                    _Actions(p: p, track: track),
-                  ],
-                ),
-                const SizedBox(height: 12),
-              ]),
-            ],
+                column([
+                  SeekBar(p: p),
+                  const SizedBox(height: 4),
+                  _Transport(p: p, skip: 52, play: w < 360 ? 64 : 72),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      QualityMenu(p: p),
+                      const Spacer(),
+                      _Actions(p: p, track: track),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                ]),
+              ],
+            ),
           );
         }
         return ConstrainedBox(
@@ -693,7 +680,6 @@ class _NarrowCover extends StatelessWidget {
               _Header(
                 p: p,
                 onOpen: onOpen,
-                edge: compact != null ? 96 : 48,
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [?compact, _QueueButton(onPressed: onQueue)],
@@ -825,7 +811,7 @@ class _NarrowLyrics extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _Header(p: p, onOpen: onOpen, edge: 48, trailing: compact),
+              _Header(p: p, onOpen: onOpen, trailing: compact),
               const SizedBox(height: 4),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
