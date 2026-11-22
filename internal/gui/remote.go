@@ -1102,6 +1102,19 @@ func (g *App) remoteForget(id string) {
 		}
 	}
 	if linked {
+		// даём компьютеру обработать unpair: он сам закроет соединение.
+		// если закрыть сразу, в буфере могут остаться его события,
+		// закрытие уйдёт с RST и команда до компьютера не дойдёт.
+		deadline := time.Now().Add(time.Second)
+		for time.Now().Before(deadline) {
+			h.mu.Lock()
+			gone := h.conn == nil || h.linkID != id
+			h.mu.Unlock()
+			if gone {
+				break
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
 		g.remoteDisconnect()
 	}
 	g.forgetHost(id)
